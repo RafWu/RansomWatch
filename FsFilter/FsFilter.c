@@ -16,25 +16,122 @@ Environment:
 
 #include "FsFilter.h"
 
+
 #pragma prefast(disable:__WARNING_ENCODE_MEMBER_FUNCTION_POINTER, "Not valid for kernel mode drivers")
-#define PTDBG_TRACE_ROUTINES            0x00000001
-#define PTDBG_TRACE_OPERATION_STATUS    0x00000002
 
-//PFLT_FILTER FilterHandle = NULL;
+#define SCANNER_REG_TAG       'Rncs'
+#define SCANNER_STRING_TAG    'Sncs'
 
-NTSTATUS FsFilterUnload(FLT_FILTER_UNLOAD_FLAGS Flags);
-FLT_POSTOP_CALLBACK_STATUS MiniPostCreateFile(PFLT_CALLBACK_DATA Data, PCFLT_RELATED_OBJECTS FltObjects, PVOID* CompletionContext, FLT_POST_OPERATION_FLAGS Flags);
-FLT_PREOP_CALLBACK_STATUS MiniPreCreateFile(PFLT_CALLBACK_DATA Data, PCFLT_RELATED_OBJECTS FltObjects, PVOID* CompletionContext);
-FLT_PREOP_CALLBACK_STATUS MiniPreWriteFile(PFLT_CALLBACK_DATA Data, PCFLT_RELATED_OBJECTS FltObjects, PVOID* CompletionContext);
+//  Structure that contains all the global data structures used throughout the driver.
+
+GLOBAL_DATA globalData;
+
+//  static list of file name extensions files we are interested in scanning
+
+PUNICODE_STRING ScannedExtensions;
+ULONG ScannedExtensionCount;
+
+//
+//  The default extension to scan if not configured in the registry
+//
+
+UNICODE_STRING ScannedExtensionDefault = RTL_CONSTANT_STRING(L"doc");
+
+
+NTSTATUS
+FSPortConnect(
+	_In_ PFLT_PORT ClientPort,
+	_In_opt_ PVOID ServerPortCookie,
+	_In_reads_bytes_opt_(SizeOfContext) PVOID ConnectionContext,
+	_In_ ULONG SizeOfContext,
+	_Outptr_result_maybenull_ PVOID *ConnectionCookie
+);
+
+VOID
+FSPortDisconnect(
+	_In_opt_ PVOID ConnectionCookie
+);
+
+NTSTATUS
+FSScanFileInUserMode(
+	_In_ PFLT_INSTANCE Instance,
+	_In_ PFILE_OBJECT FileObject,
+	_In_ ULONG pid,
+	_Out_ PBOOLEAN SafeToOpen
+);
+
+NTSTATUS
+FSAllocateUnicodeString(
+	_Inout_ PUNICODE_STRING String
+);
+
+VOID
+FSFreeUnicodeString(
+	_Inout_ PUNICODE_STRING String
+);
+
+NTSTATUS
+FSInitializeScannedExtensions(
+	_In_ PUNICODE_STRING RegistryPath
+);
+
+VOID
+FSFreeExtensions(
+);
+
+BOOLEAN
+FSpCheckExtension(
+	_In_ PUNICODE_STRING Extension
+);
+
+//
+//  Assign text sections for each routine.
+//
+
+#ifdef ALLOC_PRAGMA
+#pragma alloc_text(INIT, DriverEntry)
+#pragma alloc_text(INIT, FSInitializeScannedExtensions)    
+#pragma alloc_text(PAGE, FSPreCreate)
+#pragma alloc_text(PAGE, FSPortConnect)
+#pragma alloc_text(PAGE, FSPortDisconnect)
+#pragma alloc_text(PAGE, FSFreeExtensions)    
+#pragma alloc_text(PAGE, FSAllocateUnicodeString)
+#pragma alloc_text(PAGE, FSFreeUnicodeString)
+#endif
+
+
+//
+//  Constant FLT_REGISTRATION structure for our filter.  This
+//  initializes the callback routines our filter wants to register
+//  for.  This is only used to register with the filter manager
+//
+
 
 //
 //  operation registration
 //
 
 CONST FLT_OPERATION_REGISTRATION Callbacks[] = {
-	{IRP_MJ_CREATE, 0, MiniPreCreateFile, MiniPostCreateFile}, //create file requests
-	{IRP_MJ_WRITE, 0, MiniPreWriteFile, NULL}, // monitor write operations 
+	{IRP_MJ_CREATE, 0, FSPreCreate, FSPostCreate},		//create file requests
+	{IRP_MJ_CLEANUP, 0, FSPreCleanup, NULL},
+	{IRP_MJ_WRITE, 0, FSPreWrite, NULL},						// monitor write operations 
+#if (WINVER>=0x0602)
+
+	//{ IRP_MJ_FILE_SYSTEM_CONTROL, 0, FSPreFileSystemControl, NULL},
+
+#endif
 	{ IRP_MJ_OPERATION_END }
+};
+
+const FLT_CONTEXT_REGISTRATION ContextRegistration[] = {
+
+	{ FLT_STREAMHANDLE_CONTEXT,
+	  0,
+	  NULL,
+	  sizeof(SCANNER_STREAM_HANDLE_CONTEXT),
+	  'chBS' },
+
+	{ FLT_CONTEXT_END }
 };
 
 /*++
@@ -48,9 +145,9 @@ CONST FLT_REGISTRATION FilterRegistration = {
 	0,                                  //  Flags
 	ContextRegistration,                //  Context Registration.
 	Callbacks,                          //  Operation callbacks
-	FsFilterUnload,                      //  FilterUnload
-	FsInstanceSetup,               //  InstanceSetup
-	FsQueryTeardown,               //  InstanceQueryTeardown
+	FSUnloadDriver,                     //  FilterUnload
+	NULL,								//  InstanceSetup
+	NULL,								//  InstanceQueryTeardown
 	NULL,                               //  InstanceTeardownStart
 	NULL,                               //  InstanceTeardownComplete
 	NULL,                               //  GenerateFileName
@@ -58,140 +155,26 @@ CONST FLT_REGISTRATION FilterRegistration = {
 	NULL                                //  NormalizeNameComponent
 };
 
-FLT_POSTOP_CALLBACK_STATUS MiniPostCreateFile(PFLT_CALLBACK_DATA Data, PCFLT_RELATED_OBJECTS FltObjects, PVOID* CompletionContext, FLT_POST_OPERATION_FLAGS Flags)
-{
-	UNREFERENCED_PARAMETER(Flags);
-	UNREFERENCED_PARAMETER(Data);
-	UNREFERENCED_PARAMETER(FltObjects);
-	UNREFERENCED_PARAMETER(CompletionContext);
+////////////////////////////////////////////////////////////////////////////
+//
+//    Filter initialization and unload routines.
+//
+////////////////////////////////////////////////////////////////////////////
 
 
-	//KdPrint(("post create is running \r\n"));
-	return FLT_POSTOP_FINISHED_PROCESSING;
-}
 
-FLT_PREOP_CALLBACK_STATUS MiniPreCreateFile(PFLT_CALLBACK_DATA Data, PCFLT_RELATED_OBJECTS FltObjects, PVOID* CompletionContext)
-{
-
-	UNREFERENCED_PARAMETER(FltObjects);
-	UNREFERENCED_PARAMETER(CompletionContext);
-
-	PFLT_FILE_NAME_INFORMATION FileNameInfo;
-	NTSTATUS status;
-	const int maxLenData = 1024;
-	WCHAR Name[1024] = { 0 }; // buffer for file name
-	WCHAR dirPath[1024] = { 0 };
-
-	status = FltGetFileNameInformation(Data, FLT_FILE_NAME_NORMALIZED | FLT_FILE_NAME_QUERY_DEFAULT, &FileNameInfo); //get file name
-	
-	if (NT_SUCCESS(status)) {
-		
-		status = FltParseFileNameInformation(FileNameInfo); // parse name info, data will be in FileNameInfo
-		
-		if (NT_SUCCESS(status)) {
-
-			if (FileNameInfo->Name.MaximumLength > 120) {
-				int copyLen = FileNameInfo->Name.MaximumLength;
-				if (copyLen >= maxLenData) copyLen = maxLenData - 1;
-				
-				RtlCopyMemory(Name, FileNameInfo->Name.Buffer, copyLen);
-				RtlCopyMemory(dirPath, FileNameInfo->ParentDir.Buffer, FileNameInfo->ParentDir.MaximumLength);
-				
-				KdPrint(("Create file: %ws, in path %ws \r\n", Name, dirPath));
-
-			}
-		}
-
-		FltReleaseFileNameInformation(FileNameInfo);
-	}
-
-	return FLT_PREOP_SUCCESS_WITH_CALLBACK; //indicate we have post callback
-}
-
-FLT_PREOP_CALLBACK_STATUS MiniPreWriteFile(PFLT_CALLBACK_DATA Data, PCFLT_RELATED_OBJECTS FltObjects, PVOID* CompletionContext)
-{
-
-	UNREFERENCED_PARAMETER(FltObjects);
-	UNREFERENCED_PARAMETER(CompletionContext);
-
-	PFLT_FILE_NAME_INFORMATION FileNameInfo;
-	NTSTATUS status;
-	const int maxLenData = 1024;
-	WCHAR Name[1024] = { 0 }; // buffer for file name
-
-	status = FltGetFileNameInformation(Data, FLT_FILE_NAME_NORMALIZED | FLT_FILE_NAME_QUERY_DEFAULT, &FileNameInfo); //get file name
-
-	if (NT_SUCCESS(status)) {
-
-		status = FltParseFileNameInformation(FileNameInfo); // parse name info, data will be in FileNameInfo
-
-		if (NT_SUCCESS(status)) {
-
-			if (FileNameInfo->Name.MaximumLength > 10) {
-				int copyLen = FileNameInfo->Name.MaximumLength;
-				if (copyLen >= maxLenData) copyLen = maxLenData - 1;
-				
-				RtlCopyMemory(Name, FileNameInfo->Name.Buffer, copyLen);
-				_wcsupr(Name); //upper case string
-
-				if (wcsstr(Name, L"TEXT.TXT") != NULL) {
-					KdPrint(("Write to file: %ws blocked \r\n", Name));
-					
-					//set error on IO operation
-					Data->IoStatus.Status = STATUS_INVALID_PARAMETER;
-					FltReleaseFileNameInformation(FileNameInfo);
-					Data->IoStatus.Information = 0;
-					return FLT_PREOP_COMPLETE; //prevent passing to next filter
-
-				}
-
-
-				KdPrint(("writing to file: %ws allowed\r\n", Name));
-
-			}
-		}
-
-		FltReleaseFileNameInformation(FileNameInfo);
-	}
-
-	return FLT_PREOP_SUCCESS_NO_CALLBACK; //indicate we dont have post callback
-}
-
+NTSTATUS
+DriverEntry(
+	_In_ PDRIVER_OBJECT DriverObject,
+	_In_ PUNICODE_STRING RegistryPath
+)
 /*++
 
 Routine Description:
 
-	This is the unload routine for this miniFilter driver. This is called
-	when the minifilter is about to be unloaded. We can fail this unload
-	request if this is not a mandatory unload indicated by the Flags
-	parameter.
-
-Arguments:
-
-	Flags - Indicating if this is a mandatory unload.
-
-Return Value:
-
-	Returns STATUS_SUCCESS.
-
---*/
-NTSTATUS FsFilterUnload(FLT_FILTER_UNLOAD_FLAGS Flags)
-{
-	UNREFERENCED_PARAMETER(Flags);
-	KdPrint(("Acamol bye bye \r\n"));
-	FltCloseCommunicationPort(globals.comServerPort);
-	globals.comServerPort = NULL;
-	FltUnregisterFilter(globals.Filter);
-	KdPrint(("Acamol bye bye \r\n"));
-	return STATUS_SUCCESS;
-}
-
-/*++
-
-Routine Description:
-
-	This is the initialization routine for this miniFilter driver.  This
-	registers with FltMgr and initializes all global data structures.
+	This is the initialization routine for the Filter driver.  This
+	registers the Filter with the filter manager and initializes all
+	its global data structures.
 
 Arguments:
 
@@ -203,53 +186,1397 @@ Arguments:
 
 Return Value:
 
-	Routine can return non success error codes.
-
+	Returns STATUS_SUCCESS.
 --*/
-NTSTATUS DriverEntry(_In_ PDRIVER_OBJECT DriverObject, _In_ PUNICODE_STRING RegistryPath) 
 {
-	{
-		NTSTATUS status; // Driver status
-		PSECURITY_DESCRIPTOR sd = NULL;
+	OBJECT_ATTRIBUTES oa;
+	UNICODE_STRING uniString;
+	PSECURITY_DESCRIPTOR sd;
+	NTSTATUS status;
 
-		status = FltRegisterFilter(DriverObject, &FilterRegistration, &globals.Filter); //  Register with FltMgr to tell it our callback routines
+	//
+	//  Default to NonPagedPoolNx for non paged pool allocations where supported.
+	//
 
-		UNREFERENCED_PARAMETER(RegistryPath);
+	ExInitializeDriverRuntime(DrvRtPoolNxOptIn);
 
-		KdPrint(("Acamol filter DriverEntry entered\r\n"));
+	//
+	//  Register with filter manager.
+	//
 
-		if (NT_SUCCESS(status)) {
+	status = FltRegisterFilter(DriverObject,
+		&FilterRegistration,
+		&globalData.Filter);
 
-			// add security port for user mode apps
-			status = FltBuildDefaultSecurityDescriptor(&sd, FLT_PORT_ALL_ACCESS);
-			if (!NT_SUCCESS(status)) {
 
-				FltUnregisterFilter(globals.Filter); // fail to start - unregister
-				globals.Filter = NULL;
-			}
-			
-			//open com port
-			status = FsPreparePort(sd);
-			if (!NT_SUCCESS(status)) {
-				FltUnregisterFilter(globals.Filter); // fail to start - unregister
-				globals.Filter = NULL;
-			}
-			
-			if (sd != NULL) {
-				FltFreeSecurityDescriptor(sd);
-			}
-
-			//  Start filtering i/o
-			status = FltStartFiltering(globals.Filter); // start Driver filtering
-			if (NT_SUCCESS(status)) {
-				return status;
-			}
-			FltCloseCommunicationPort(globals.comServerPort);
-			FltUnregisterFilter(globals.Filter); // fail to start - unregister
-			globals.Filter = NULL;
-			globals.comServerPort = NULL;
-		}
+	if (!NT_SUCCESS(status)) {
 
 		return status;
 	}
+
+
+	//
+	// Obtain the extensions to scan
+	//
+
+	status = FSInitializeScannedExtensions(RegistryPath);
+
+	if (!NT_SUCCESS(status)) {
+
+		status = STATUS_SUCCESS;
+
+		ScannedExtensions = &ScannedExtensionDefault;
+		ScannedExtensionCount = 1;
+	}
+
+	//
+	//  Create a communication port.
+	//
+
+	RtlInitUnicodeString(&uniString, ScannerPortName);
+
+	//
+	//  We secure the port so only ADMINs & SYSTEM can acecss it.
+	//
+
+	status = FltBuildDefaultSecurityDescriptor(&sd, FLT_PORT_ALL_ACCESS);
+
+	if (NT_SUCCESS(status)) {
+
+		InitializeObjectAttributes(&oa,
+			&uniString,
+			OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE,
+			NULL,
+			sd);
+
+		status = FltCreateCommunicationPort(globalData.Filter,
+			&globalData.ServerPort,
+			&oa,
+			NULL,
+			FSPortConnect,
+			FSPortDisconnect,
+			NULL,
+			1);
+		//
+		//  Free the security descriptor in all cases. It is not needed once
+		//  the call to FltCreateCommunicationPort() is made.
+		//
+
+		FltFreeSecurityDescriptor(sd);
+
+		if (NT_SUCCESS(status)) {
+
+			//
+			//  Start filtering I/O.
+			//
+
+			status = FltStartFiltering(globalData.Filter);
+
+			if (NT_SUCCESS(status)) {
+				DbgPrint("loaded scanner successfully");
+				return STATUS_SUCCESS;
+			}
+
+			FltCloseCommunicationPort(globalData.ServerPort);
+		}
+	}
+
+	FSFreeExtensions();
+
+	FltUnregisterFilter(globalData.Filter);
+
+	return status;
+}
+
+NTSTATUS
+FSInitializeScannedExtensions(
+	_In_ PUNICODE_STRING RegistryPath
+)
+/*++
+
+Routine Descrition:
+
+	This routine sets the the extensions for files to be scanned based
+	on the registry.
+
+Arguments:
+
+	RegistryPath - The path key passed to the driver during DriverEntry.
+
+Return Value:
+
+	STATUS_SUCCESS if the function completes successfully.  Otherwise a valid
+	NTSTATUS code is returned.
+
+--*/
+{
+	NTSTATUS status;
+	OBJECT_ATTRIBUTES attributes;
+	HANDLE driverRegKey = NULL;
+	UNICODE_STRING valueName;
+	PKEY_VALUE_PARTIAL_INFORMATION valueBuffer = NULL;
+	ULONG valueLength = 0;
+	BOOLEAN closeHandle = FALSE;
+	PWCHAR ch;
+	SIZE_T length;
+	ULONG count;
+	PUNICODE_STRING ext;
+
+	PAGED_CODE();
+
+	ScannedExtensions = NULL;
+	ScannedExtensionCount = 0;
+
+	//
+	//  Open the driver registry key.
+	//
+
+	InitializeObjectAttributes(&attributes,
+		RegistryPath,
+		OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE,
+		NULL,
+		NULL);
+
+	status = ZwOpenKey(&driverRegKey,
+		KEY_READ,
+		&attributes);
+
+	if (!NT_SUCCESS(status)) {
+
+		goto FSInitializeScannedExtensionsCleanup;
+	}
+
+	closeHandle = TRUE;
+
+	//
+	//   Query the length of the reg value
+	//
+
+	RtlInitUnicodeString(&valueName, L"Extensions");
+
+	status = ZwQueryValueKey(driverRegKey,
+		&valueName,
+		KeyValuePartialInformation,
+		NULL,
+		0,
+		&valueLength);
+
+	if (status != STATUS_BUFFER_TOO_SMALL && status != STATUS_BUFFER_OVERFLOW) {
+
+		status = STATUS_INVALID_PARAMETER;
+		goto FSInitializeScannedExtensionsCleanup;
+	}
+
+	//
+	//  Extract the path.
+	//
+
+	valueBuffer = ExAllocatePoolWithTag(NonPagedPool,
+		valueLength,
+		SCANNER_REG_TAG);
+
+	if (valueBuffer == NULL) {
+
+		status = STATUS_INSUFFICIENT_RESOURCES;
+		goto FSInitializeScannedExtensionsCleanup;
+	}
+
+	status = ZwQueryValueKey(driverRegKey,
+		&valueName,
+		KeyValuePartialInformation,
+		valueBuffer,
+		valueLength,
+		&valueLength);
+
+	if (!NT_SUCCESS(status)) {
+
+		goto FSInitializeScannedExtensionsCleanup;
+	}
+
+	ch = (PWCHAR)(valueBuffer->Data);
+
+	count = 0;
+
+	//
+	//  Count how many strings are in the multi string
+	//
+
+	while (*ch != '\0') {
+
+		ch = ch + wcslen(ch) + 1;
+		count++;
+	}
+
+	ScannedExtensions = ExAllocatePoolWithTag(PagedPool,
+		count * sizeof(UNICODE_STRING),
+		SCANNER_STRING_TAG);
+
+	if (ScannedExtensions == NULL) {
+		goto FSInitializeScannedExtensionsCleanup;
+	}
+
+	ch = (PWCHAR)((PKEY_VALUE_PARTIAL_INFORMATION)valueBuffer->Data);
+	ext = ScannedExtensions;
+
+	while (ScannedExtensionCount < count) {
+
+		length = wcslen(ch) * sizeof(WCHAR);
+
+		ext->MaximumLength = (USHORT)length;
+
+		status = FSAllocateUnicodeString(ext);
+
+		if (!NT_SUCCESS(status)) {
+			goto FSInitializeScannedExtensionsCleanup;
+		}
+
+		ext->Length = (USHORT)length;
+
+		RtlCopyMemory(ext->Buffer, ch, length);
+
+		ch = ch + length / sizeof(WCHAR) + 1;
+
+		ScannedExtensionCount++;
+
+		ext++;
+
+	}
+
+FSInitializeScannedExtensionsCleanup:
+
+	//
+	//  Note that this function leaks the global buffers.
+	//  On failure DriverEntry will clean up the globals
+	//  so we don't have to do that here.
+	//
+
+	if (valueBuffer != NULL) {
+
+		ExFreePoolWithTag(valueBuffer, SCANNER_REG_TAG);
+		valueBuffer = NULL;
+	}
+
+	if (closeHandle) {
+
+		ZwClose(driverRegKey);
+	}
+
+	if (!NT_SUCCESS(status)) {
+
+		FSFreeExtensions();
+	}
+
+	return status;
+}
+
+
+VOID
+FSFreeExtensions(
+)
+/*++
+
+Routine Descrition:
+
+	This routine cleans up the global buffers on both
+	teardown and initialization failure.
+
+Arguments:
+
+Return Value:
+
+	None.
+
+--*/
+{
+	PAGED_CODE();
+
+	//
+	// Free the strings in the scanned extension array
+	//
+
+	while (ScannedExtensionCount > 0) {
+
+		ScannedExtensionCount--;
+
+		if (ScannedExtensions != &ScannedExtensionDefault) {
+
+			FSFreeUnicodeString(ScannedExtensions + ScannedExtensionCount);
+		}
+	}
+
+	if (ScannedExtensions != &ScannedExtensionDefault && ScannedExtensions != NULL) {
+
+		ExFreePoolWithTag(ScannedExtensions, SCANNER_STRING_TAG);
+	}
+
+	ScannedExtensions = NULL;
+
+}
+
+NTSTATUS
+FSAllocateUnicodeString(
+	_Inout_ PUNICODE_STRING String
+)
+/*++
+
+Routine Description:
+
+	This routine allocates a unicode string
+
+Arguments:
+
+	String - supplies the size of the string to be allocated in the MaximumLength field
+			 return the unicode string
+
+Return Value:
+
+	STATUS_SUCCESS                  - success
+	STATUS_INSUFFICIENT_RESOURCES   - failure
+
+--*/
+{
+
+	PAGED_CODE();
+
+	String->Buffer = ExAllocatePoolWithTag(NonPagedPool,
+		String->MaximumLength,
+		SCANNER_STRING_TAG);
+
+	if (String->Buffer == NULL) {
+
+		return STATUS_INSUFFICIENT_RESOURCES;
+	}
+
+	String->Length = 0;
+
+	return STATUS_SUCCESS;
+}
+
+
+VOID
+FSFreeUnicodeString(
+	_Inout_ PUNICODE_STRING String
+)
+/*++
+
+Routine Description:
+
+	This routine frees a unicode string
+
+Arguments:
+
+	String - supplies the string to be freed
+
+Return Value:
+
+	None
+
+--*/
+{
+	PAGED_CODE();
+
+	if (String->Buffer) {
+
+		ExFreePoolWithTag(String->Buffer,
+			SCANNER_STRING_TAG);
+		String->Buffer = NULL;
+	}
+
+	String->Length = String->MaximumLength = 0;
+	String->Buffer = NULL;
+}
+
+
+NTSTATUS
+FSPortConnect(
+	_In_ PFLT_PORT ClientPort,
+	_In_opt_ PVOID ServerPortCookie,
+	_In_reads_bytes_opt_(SizeOfContext) PVOID ConnectionContext,
+	_In_ ULONG SizeOfContext,
+	_Outptr_result_maybenull_ PVOID *ConnectionCookie
+)
+/*++
+
+Routine Description
+
+	This is called when user-mode connects to the server port - to establish a
+	connection
+
+Arguments
+
+	ClientPort - This is the client connection port that will be used to
+		send messages from the filter
+
+	ServerPortCookie - The context associated with this port when the
+		minifilter created this port.
+
+	ConnectionContext - Context from entity connecting to this port (most likely
+		your user mode service)
+
+	SizeofContext - Size of ConnectionContext in bytes
+
+	ConnectionCookie - Context to be passed to the port disconnect routine.
+
+Return Value
+
+	STATUS_SUCCESS - to accept the connection
+
+--*/
+{
+	PAGED_CODE();
+
+	UNREFERENCED_PARAMETER(ServerPortCookie);
+	UNREFERENCED_PARAMETER(ConnectionContext);
+	UNREFERENCED_PARAMETER(SizeOfContext);
+	UNREFERENCED_PARAMETER(ConnectionCookie = NULL);
+
+	FLT_ASSERT(globalData.ClientPort == NULL);
+	FLT_ASSERT(globalData.UserProcess == NULL);
+
+	//
+	//  Set the user process and port. In a production filter it may
+	//  be necessary to synchronize access to such fields with port
+	//  lifetime. For instance, while filter manager will synchronize
+	//  FltCloseClientPort with FltSendMessage's reading of the port 
+	//  handle, synchronizing access to the UserProcess would be up to
+	//  the filter.
+	//
+
+	globalData.UserProcess = PsGetCurrentProcess();
+	globalData.ClientPort = ClientPort;
+
+	DbgPrint("!!! scanner.sys --- connected, port=0x%p\n", ClientPort);
+
+	return STATUS_SUCCESS;
+}
+
+
+VOID
+FSPortDisconnect(
+	_In_opt_ PVOID ConnectionCookie
+)
+/*++
+
+Routine Description
+
+	This is called when the connection is torn-down. We use it to close our
+	handle to the connection
+
+Arguments
+
+	ConnectionCookie - Context from the port connect routine
+
+Return value
+
+	None
+
+--*/
+{
+	UNREFERENCED_PARAMETER(ConnectionCookie);
+
+	PAGED_CODE();
+
+	DbgPrint("!!! scanner.sys --- disconnected, port=0x%p\n", globalData.ClientPort);
+
+	//
+	//  Close our handle to the connection: note, since we limited max connections to 1,
+	//  another connect will not be allowed until we return from the disconnect routine.
+	//
+
+	FltCloseClientPort(globalData.Filter, &globalData.ClientPort);
+
+	//
+	//  Reset the user-process field.
+	//
+	DbgPrint("Disconnent");
+	globalData.UserProcess = NULL;
+}
+
+
+NTSTATUS
+FSUnloadDriver(
+	_In_ FLT_FILTER_UNLOAD_FLAGS Flags
+)
+/*++
+
+Routine Description:
+
+	This is the unload routine for the Filter driver.  This unregisters the
+	Filter with the filter manager and frees any allocated global data
+	structures.
+
+Arguments:
+
+	None.
+
+Return Value:
+
+	Returns the final status of the deallocation routines.
+
+--*/
+{
+	UNREFERENCED_PARAMETER(Flags);
+
+	FSFreeExtensions();
+
+	//
+	//  Close the server port.
+	//
+
+	FltCloseCommunicationPort(globalData.ServerPort);
+
+	//
+	//  Unregister the filter
+	//
+
+	FltUnregisterFilter(globalData.Filter);
+
+	return STATUS_SUCCESS;
+}
+
+FLT_PREOP_CALLBACK_STATUS
+FSPreCreate(
+	_Inout_ PFLT_CALLBACK_DATA Data,
+	_In_ PCFLT_RELATED_OBJECTS FltObjects,
+	_Flt_CompletionContext_Outptr_ PVOID *CompletionContext
+)
+/*++
+
+Routine Description:
+
+	Pre create callback.  We need to remember whether this file has been
+	opened for write access.  If it has, we'll want to rescan it in cleanup.
+	This scheme results in extra scans in at least two cases:
+	-- if the create fails (perhaps for access denied)
+	-- the file is opened for write access but never actually written to
+	The assumption is that writes are more common than creates, and checking
+	or setting the context in the write path would be less efficient than
+	taking a good guess before the create.
+
+Arguments:
+
+	Data - The structure which describes the operation parameters.
+
+	FltObject - The structure which describes the objects affected by this
+		operation.
+
+	CompletionContext - Output parameter which can be used to pass a context
+		from this pre-create callback to the post-create callback.
+
+Return Value:
+
+   FLT_PREOP_SUCCESS_WITH_CALLBACK - If this is not our user-mode process.
+   FLT_PREOP_SUCCESS_NO_CALLBACK - All other threads.
+
+--*/
+{
+	UNREFERENCED_PARAMETER(FltObjects);
+	UNREFERENCED_PARAMETER(CompletionContext = NULL);
+
+	PAGED_CODE();
+
+	//
+	//  See if this create is being done by our user process.
+	//
+
+	if (IoThreadToProcess(Data->Thread) == globalData.UserProcess) {
+
+		DbgPrint("!!! scanner.sys -- allowing create for trusted process \n");
+
+		return FLT_PREOP_SUCCESS_NO_CALLBACK;
+	}
+
+	return FLT_PREOP_SUCCESS_WITH_CALLBACK;
+}
+
+FLT_POSTOP_CALLBACK_STATUS
+FSPostCreate(
+	_Inout_ PFLT_CALLBACK_DATA Data,
+	_In_ PCFLT_RELATED_OBJECTS FltObjects,
+	_In_opt_ PVOID CompletionContext,
+	_In_ FLT_POST_OPERATION_FLAGS Flags
+)
+/*++
+
+Routine Description:
+
+	Post create callback.  We can't scan the file until after the create has
+	gone to the filesystem, since otherwise the filesystem wouldn't be ready
+	to read the file for us.
+
+Arguments:
+
+	Data - The structure which describes the operation parameters.
+
+	FltObject - The structure which describes the objects affected by this
+		operation.
+
+	CompletionContext - The operation context passed fron the pre-create
+		callback.
+
+	Flags - Flags to say why we are getting this post-operation callback.
+
+Return Value:
+
+	FLT_POSTOP_FINISHED_PROCESSING - ok to open the file or we wish to deny
+									 access to this file, hence undo the open
+
+--*/
+{
+	PSCANNER_STREAM_HANDLE_CONTEXT scannerContext;
+	FLT_POSTOP_CALLBACK_STATUS returnStatus = FLT_POSTOP_FINISHED_PROCESSING;
+	PFLT_FILE_NAME_INFORMATION nameInfo;
+	NTSTATUS status;
+	BOOLEAN safeToOpen, scanFile;
+	ULONG reqPID;
+
+	UNREFERENCED_PARAMETER(CompletionContext);
+	UNREFERENCED_PARAMETER(Flags);
+
+	//
+	//  If this create was failing anyway, don't bother scanning now.
+	//
+
+	if (!NT_SUCCESS(Data->IoStatus.Status) ||
+		(STATUS_REPARSE == Data->IoStatus.Status)) {
+
+		return FLT_POSTOP_FINISHED_PROCESSING;
+	}
+
+	//
+	//  Check if we are interested in this file.
+	//
+
+	status = FltGetFileNameInformation(Data,
+		FLT_FILE_NAME_NORMALIZED |
+		FLT_FILE_NAME_QUERY_DEFAULT,
+		&nameInfo);
+
+	if (!NT_SUCCESS(status)) {
+
+		return FLT_POSTOP_FINISHED_PROCESSING;
+	}
+
+	reqPID = FltGetRequestorProcessId(Data);
+
+
+	FltParseFileNameInformation(nameInfo);
+
+	//
+	//  Check if the extension matches the list of extensions we are interested in
+	//
+
+	scanFile = FSpCheckExtension(&nameInfo->Extension);
+
+	//
+	//  Release file name info, we're done with it
+	//
+
+	FltReleaseFileNameInformation(nameInfo);
+
+	if (!scanFile) {
+
+		//
+		//  Not an extension we are interested in
+		//
+
+		return FLT_POSTOP_FINISHED_PROCESSING;
+	}
+
+	(VOID)FSScanFileInUserMode(FltObjects->Instance, FltObjects->FileObject, reqPID, &safeToOpen);
+
+	if (!safeToOpen) {
+
+		//
+		//  Ask the filter manager to undo the create.
+		//
+
+		DbgPrint("!!! scanner.sys -- foul language detected in postcreate !!!\n");
+
+		DbgPrint("!!! scanner.sys -- undoing create \n");
+
+		FltCancelFileOpen(FltObjects->Instance, FltObjects->FileObject);
+
+		Data->IoStatus.Status = STATUS_ACCESS_DENIED;
+		Data->IoStatus.Information = 0;
+
+		returnStatus = FLT_POSTOP_FINISHED_PROCESSING;
+
+	}
+	else if (FltObjects->FileObject->WriteAccess) {
+
+		//
+		//
+		//  The create has requested write access, mark to rescan the file.
+		//  Allocate the context.
+		//
+
+		status = FltAllocateContext(globalData.Filter,
+			FLT_STREAMHANDLE_CONTEXT,
+			sizeof(SCANNER_STREAM_HANDLE_CONTEXT),
+			PagedPool,
+			&scannerContext);
+
+		if (NT_SUCCESS(status)) {
+
+			//
+			//  Set the handle context.
+			//
+
+			scannerContext->RescanRequired = TRUE;
+
+			(VOID)FltSetStreamHandleContext(FltObjects->Instance,
+				FltObjects->FileObject,
+				FLT_SET_CONTEXT_REPLACE_IF_EXISTS,
+				scannerContext,
+				NULL);
+
+			//
+			//  Normally we would check the results of FltSetStreamHandleContext
+			//  for a variety of error cases. However, The only error status 
+			//  that could be returned, in this case, would tell us that
+			//  contexts are not supported.  Even if we got this error,
+			//  we just want to release the context now and that will free
+			//  this memory if it was not successfully set.
+			//
+
+			//
+			//  Release our reference on the context (the set adds a reference)
+			//
+
+			FltReleaseContext(scannerContext);
+		}
+	}
+
+	return returnStatus;
+}
+
+
+FLT_PREOP_CALLBACK_STATUS
+FSPreCleanup(
+	_Inout_ PFLT_CALLBACK_DATA Data,
+	_In_ PCFLT_RELATED_OBJECTS FltObjects,
+	_Flt_CompletionContext_Outptr_ PVOID *CompletionContext
+)
+/*++
+
+Routine Description:
+
+	Pre cleanup callback.  If this file was opened for write access, we want
+	to rescan it now.
+
+Arguments:
+
+	Data - The structure which describes the operation parameters.
+
+	FltObject - The structure which describes the objects affected by this
+		operation.
+
+	CompletionContext - Output parameter which can be used to pass a context
+		from this pre-cleanup callback to the post-cleanup callback.
+
+Return Value:
+
+	Always FLT_PREOP_SUCCESS_NO_CALLBACK.
+
+--*/
+{
+	NTSTATUS status;
+	PSCANNER_STREAM_HANDLE_CONTEXT context;
+	BOOLEAN safe;
+	ULONG reqPID;
+
+	UNREFERENCED_PARAMETER(CompletionContext);
+
+	reqPID = FltGetRequestorProcessId(Data);
+
+	status = FltGetStreamHandleContext(FltObjects->Instance,
+		FltObjects->FileObject,
+		&context);
+
+	if (NT_SUCCESS(status)) {
+
+		if (context->RescanRequired) {
+
+			(VOID)FSScanFileInUserMode(FltObjects->Instance, FltObjects->FileObject, reqPID, &safe);
+
+			if (!safe) {
+
+				DbgPrint("!!! scanner.sys -- foul language detected in precleanup !!!\n");
+			}
+		}
+
+		FltReleaseContext(context);
+	}
+
+
+	return FLT_PREOP_SUCCESS_NO_CALLBACK;
+}
+
+
+FLT_PREOP_CALLBACK_STATUS
+FSPreWrite(
+	_Inout_ PFLT_CALLBACK_DATA Data,
+	_In_ PCFLT_RELATED_OBJECTS FltObjects,
+	_Flt_CompletionContext_Outptr_ PVOID *CompletionContext
+)
+/*++
+
+Routine Description:
+
+	Pre write callback.  We want to scan what's being written now.
+
+Arguments:
+
+	Data - The structure which describes the operation parameters.
+
+	FltObject - The structure which describes the objects affected by this
+		operation.
+
+	CompletionContext - Output parameter which can be used to pass a context
+		from this pre-write callback to the post-write callback.
+
+Return Value:
+
+	Always FLT_PREOP_SUCCESS_NO_CALLBACK.
+
+--*/
+{
+	FLT_PREOP_CALLBACK_STATUS returnStatus = FLT_PREOP_SUCCESS_NO_CALLBACK;
+	NTSTATUS status;
+	PSCANNER_NOTIFICATION notification = NULL;
+	PSCANNER_STREAM_HANDLE_CONTEXT context = NULL;
+	ULONG replyLength;
+	BOOLEAN safe = TRUE;
+	PUCHAR buffer;
+
+	UNREFERENCED_PARAMETER(CompletionContext);
+
+	//
+	//  If not client port just ignore this write.
+	//
+
+	if (globalData.ClientPort == NULL) {
+
+		return FLT_PREOP_SUCCESS_NO_CALLBACK;
+	}
+
+	status = FltGetStreamHandleContext(FltObjects->Instance,
+		FltObjects->FileObject,
+		&context);
+
+	if (!NT_SUCCESS(status)) {
+
+		//
+		//  We are not interested in this file
+		//
+
+		return FLT_PREOP_SUCCESS_NO_CALLBACK;
+	}
+
+	//
+	//  Use try-finally to cleanup
+	//
+
+	try {
+
+		//
+		//  Pass the contents of the buffer to user mode.
+		//
+
+		if (Data->Iopb->Parameters.Write.Length != 0) {
+
+			//
+			//  Get the users buffer address.  If there is a MDL defined, use
+			//  it.  If not use the given buffer address.
+			//
+
+			if (Data->Iopb->Parameters.Write.MdlAddress != NULL) {
+
+				buffer = MmGetSystemAddressForMdlSafe(Data->Iopb->Parameters.Write.MdlAddress,
+					NormalPagePriority | MdlMappingNoExecute);
+
+				//
+				//  If we have a MDL but could not get and address, we ran out
+				//  of memory, report the correct error
+				//
+
+				if (buffer == NULL) {
+
+					Data->IoStatus.Status = STATUS_INSUFFICIENT_RESOURCES;
+					Data->IoStatus.Information = 0;
+					returnStatus = FLT_PREOP_COMPLETE;
+					leave;
+				}
+
+			}
+			else {
+
+				//
+				//  Use the users buffer
+				//
+
+				buffer = Data->Iopb->Parameters.Write.WriteBuffer;
+			}
+
+			//
+			//  In a production-level filter, we would actually let user mode scan the file directly.
+			//  Allocating & freeing huge amounts of non-paged pool like this is not very good for system perf.
+			//  This is just a sample!
+			//
+
+			notification = ExAllocatePoolWithTag(NonPagedPool,
+				sizeof(SCANNER_NOTIFICATION),
+				'nacS');
+			if (notification == NULL) {
+
+				Data->IoStatus.Status = STATUS_INSUFFICIENT_RESOURCES;
+				Data->IoStatus.Information = 0;
+				returnStatus = FLT_PREOP_COMPLETE;
+				leave;
+			}
+
+			notification->BytesToScan = min(Data->Iopb->Parameters.Write.Length, SCANNER_READ_BUFFER_SIZE);
+
+			//
+			//  The buffer can be a raw user buffer. Protect access to it
+			//
+
+			try {
+
+				RtlCopyMemory(&notification->Contents,
+					buffer,
+					notification->BytesToScan);
+
+			} except(EXCEPTION_EXECUTE_HANDLER) {
+
+				//
+				//  Error accessing buffer. Complete i/o with failure
+				//
+
+				Data->IoStatus.Status = GetExceptionCode();
+				Data->IoStatus.Information = 0;
+				returnStatus = FLT_PREOP_COMPLETE;
+				leave;
+			}
+
+			//
+			//  Send message to user mode to indicate it should scan the buffer.
+			//  We don't have to synchronize between the send and close of the handle
+			//  as FltSendMessage takes care of that.
+			//
+
+			replyLength = sizeof(SCANNER_REPLY);
+
+			status = FltSendMessage(globalData.Filter,
+				&globalData.ClientPort,
+				notification,
+				sizeof(SCANNER_NOTIFICATION),
+				notification,
+				&replyLength,
+				NULL);
+
+			if (STATUS_SUCCESS == status) {
+
+				safe = ((PSCANNER_REPLY)notification)->SafeToOpen;
+
+			}
+			else {
+
+				//
+				//  Couldn't send message. This sample will let the i/o through.
+				//
+
+				DbgPrint("!!! scanner.sys --- couldn't send message to user-mode to scan file, status 0x%X\n", status);
+			}
+		}
+
+		if (!safe) {
+
+			//
+			//  Block this write if not paging i/o (as a result of course, this scanner will not prevent memory mapped writes of contaminated
+			//  strings to the file, but only regular writes). The effect of getting ERROR_ACCESS_DENIED for many apps to delete the file they
+			//  are trying to write usually.
+			//  To handle memory mapped writes - we should be scanning at close time (which is when we can really establish that the file object
+			//  is not going to be used for any more writes)
+			//
+
+			DbgPrint("!!! scanner.sys -- foul language detected in write !!!\n");
+
+			if (!FlagOn(Data->Iopb->IrpFlags, IRP_PAGING_IO)) {
+
+				DbgPrint("!!! scanner.sys -- blocking the write !!!\n");
+
+				Data->IoStatus.Status = STATUS_ACCESS_DENIED;
+				Data->IoStatus.Information = 0;
+				returnStatus = FLT_PREOP_COMPLETE;
+			}
+		}
+
+	}
+	finally{
+
+	 if (notification != NULL) {
+
+		 ExFreePoolWithTag(notification, 'nacS');
+	 }
+
+	 if (context) {
+
+		 FltReleaseContext(context);
+	 }
+	}
+
+	return returnStatus;
+}
+
+#if (WINVER>=0x0602)
+
+FLT_PREOP_CALLBACK_STATUS
+FSPreFileSystemControl(
+	_Inout_ PFLT_CALLBACK_DATA Data,
+	_In_ PCFLT_RELATED_OBJECTS FltObjects,
+	_Flt_CompletionContext_Outptr_ PVOID *CompletionContext
+)
+/*++
+
+Routine Description:
+
+	Pre FS Control callback.
+
+Arguments:
+
+	Data - The structure which describes the operation parameters.
+
+	FltObject - The structure which describes the objects affected by this
+		operation.
+
+	CompletionContext - Output parameter which can be used to pass a context
+		from this callback to the post-write callback.
+
+Return Value:
+
+	FLT_PREOP_SUCCESS_NO_CALLBACK or FLT_PREOP_COMPLETE
+
+--*/
+{
+	FLT_PREOP_CALLBACK_STATUS returnStatus = FLT_PREOP_SUCCESS_NO_CALLBACK;
+	NTSTATUS status;
+	ULONG fsControlCode;
+	PSCANNER_STREAM_HANDLE_CONTEXT context = NULL;
+
+	UNREFERENCED_PARAMETER(CompletionContext);
+
+	FLT_ASSERT(Data != NULL);
+	FLT_ASSERT(Data->Iopb != NULL);
+
+	//
+	//  If not client port just ignore this write.
+	//
+
+	if (globalData.ClientPort == NULL) {
+
+		return FLT_PREOP_SUCCESS_NO_CALLBACK;
+	}
+
+	status = FltGetStreamHandleContext(FltObjects->Instance,
+		FltObjects->FileObject,
+		&context);
+
+	if (!NT_SUCCESS(status)) {
+
+		//
+		//  We are not interested in this file
+		//
+
+		return FLT_PREOP_SUCCESS_NO_CALLBACK;
+	}
+
+	//
+	//  Use try-finally to cleanup
+	//
+
+	try {
+
+		fsControlCode = Data->Iopb->Parameters.FileSystemControl.Common.FsControlCode;
+
+		if (fsControlCode == FSCTL_OFFLOAD_WRITE) {
+
+			//
+			//  Scanner cannot access the data in this offload write request.
+			//  In a production-level filter, we would actually let user mode 
+			//  scan the file after offload write completes (on cleanup etc).
+			//  Since this is just a sample, block offload write with
+			//  STATUS_ACCESS_DENIED, although this is not an acceptable
+			//  production-level behavior.
+			//
+
+			DbgPrint("!!! scanner.sys -- blocking the offload write !!!\n");
+
+			Data->IoStatus.Status = STATUS_ACCESS_DENIED;
+			Data->IoStatus.Information = 0;
+
+			returnStatus = FLT_PREOP_COMPLETE;
+		}
+
+	}
+	finally{
+
+	 if (context) {
+
+		 FltReleaseContext(context);
+	 }
+	}
+
+	return returnStatus;
+}
+
+#endif
+
+//////////////////////////////////////////////////////////////////////////
+//  Local support routines.
+//
+/////////////////////////////////////////////////////////////////////////
+
+NTSTATUS
+FSScanFileInUserMode(
+	_In_ PFLT_INSTANCE Instance,
+	_In_ PFILE_OBJECT FileObject,
+	_In_ ULONG	pid,
+	_Out_ PBOOLEAN SafeToOpen
+
+)
+/*++
+
+Routine Description:
+
+	This routine is called to send a request up to user mode to scan a given
+	file and tell our caller whether it's safe to open this file.
+
+	Note that if the scan fails, we set SafeToOpen to TRUE.  The scan may fail
+	because the service hasn't started, or perhaps because this create/cleanup
+	is for a directory, and there's no data to read & scan.
+
+	If we failed creates when the service isn't running, there'd be a
+	bootstrapping problem -- how would we ever load the .exe for the service?
+
+Arguments:
+
+	Instance - Handle to the filter instance for the scanner on this volume.
+
+	FileObject - File to be scanned.
+
+	SafeToOpen - Set to FALSE if the file is scanned successfully and it contains
+				 foul language.
+
+Return Value:
+
+	The status of the operation, hopefully STATUS_SUCCESS.  The common failure
+	status will probably be STATUS_INSUFFICIENT_RESOURCES.
+
+--*/
+
+{
+	NTSTATUS status = STATUS_SUCCESS;
+	PVOID buffer = NULL;
+	ULONG bytesRead;
+	PSCANNER_NOTIFICATION notification = NULL;
+	FLT_VOLUME_PROPERTIES volumeProps;
+	LARGE_INTEGER offset;
+	ULONG replyLength, length;
+	PFLT_VOLUME volume = NULL;
+
+	*SafeToOpen = TRUE;
+
+	//
+	//  If not client port just return.
+	//
+
+	if (globalData.ClientPort == NULL) {
+
+		return STATUS_SUCCESS;
+	}
+
+	try {
+
+		//
+		//  Obtain the volume object .
+		//
+
+		status = FltGetVolumeFromInstance(Instance, &volume);
+
+		if (!NT_SUCCESS(status)) {
+
+			leave;
+		}
+
+		//
+		//  Determine sector size. Noncached I/O can only be done at sector size offsets, and in lengths which are
+		//  multiples of sector size. A more efficient way is to make this call once and remember the sector size in the
+		//  instance setup routine and setup an instance context where we can cache it.
+		//
+
+		status = FltGetVolumeProperties(volume,
+			&volumeProps,
+			sizeof(volumeProps),
+			&length);
+		//
+		//  STATUS_BUFFER_OVERFLOW can be returned - however we only need the properties, not the names
+		//  hence we only check for error status.
+		//
+
+		if (NT_ERROR(status)) {
+
+			leave;
+		}
+
+		length = max(SCANNER_READ_BUFFER_SIZE, volumeProps.SectorSize);
+
+		//
+		//  Use non-buffered i/o, so allocate aligned pool
+		//
+
+		buffer = FltAllocatePoolAlignedWithTag(Instance,
+			NonPagedPool,
+			length,
+			'nacS');
+
+		if (NULL == buffer) {
+
+			status = STATUS_INSUFFICIENT_RESOURCES;
+			leave;
+		}
+
+		notification = ExAllocatePoolWithTag(NonPagedPool,
+			sizeof(SCANNER_NOTIFICATION),
+			'nacS');
+
+		if (NULL == notification) {
+
+			status = STATUS_INSUFFICIENT_RESOURCES;
+			leave;
+		}
+
+		//
+		//  Read the beginning of the file and pass the contents to user mode.
+		//
+
+		offset.QuadPart = bytesRead = 0;
+		status = FltReadFile(Instance,
+			FileObject,
+			&offset,
+			length,
+			buffer,
+			FLTFL_IO_OPERATION_NON_CACHED |
+			FLTFL_IO_OPERATION_DO_NOT_UPDATE_BYTE_OFFSET,
+			&bytesRead,
+			NULL,
+			NULL);
+
+		if (NT_SUCCESS(status) && (0 != bytesRead)) {
+
+			notification->BytesToScan = (ULONG)bytesRead;
+
+			//
+			//  Copy only as much as the buffer can hold
+			//
+
+			RtlCopyMemory(&notification->Contents,
+				buffer,
+				min(notification->BytesToScan, SCANNER_READ_BUFFER_SIZE));
+
+			notification->PID = pid;
+
+			replyLength = sizeof(SCANNER_REPLY);
+
+			status = FltSendMessage(globalData.Filter,
+				&globalData.ClientPort,
+				notification,
+				sizeof(SCANNER_NOTIFICATION),
+				notification,
+				&replyLength,
+				NULL);
+
+			if (STATUS_SUCCESS == status) {
+
+				*SafeToOpen = ((PSCANNER_REPLY)notification)->SafeToOpen;
+
+			}
+			else {
+
+				//
+				//  Couldn't send message
+				//
+
+				DbgPrint("!!! scanner.sys --- couldn't send message to user-mode to scan file, status 0x%X\n", status);
+			}
+		}
+
+	}
+	finally{
+
+	 if (NULL != buffer) {
+
+		 FltFreePoolAlignedWithTag(Instance, buffer, 'nacS');
+	 }
+
+	 if (NULL != notification) {
+
+		 ExFreePoolWithTag(notification, 'nacS');
+	 }
+
+	 if (NULL != volume) {
+
+		 FltObjectDereference(volume);
+	 }
+	}
+
+	return status;
+}
+
+
+BOOLEAN
+FSpCheckExtension(
+	_In_ PUNICODE_STRING Extension
+)
+/*++
+
+Routine Description:
+
+	Checks if this file name extension is something we are interested in
+
+Arguments
+
+	Extension - Pointer to the file name extension
+
+Return Value
+
+	TRUE - Yes we are interested
+	FALSE - No
+--*/
+{
+	ULONG count;
+
+	if (Extension->Length == 0) {
+
+		return FALSE;
+	}
+
+	//
+	//  Check if it matches any one of our static extension list
+	//
+
+	for (count = 0; count < ScannedExtensionCount; count++) {
+
+		if (RtlCompareUnicodeString(Extension, ScannedExtensions + count, TRUE) == 0) {
+
+			//
+			//  A match. We are interested in this file
+			//
+
+			return TRUE;
+		}
+	}
+
+	return FALSE;
 }

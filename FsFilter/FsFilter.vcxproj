@@ -36,7 +36,6 @@
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="FsFilter.rc" />
-    <ClCompile Include="communication.c" />
     <ClCompile Include="FsFilter.c" />
     <Inf Include="FsFilter.inf" />
   </ItemGroup>
@@ -190,6 +189,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="FsFilter.h" />
+    <ClInclude Include="ukshared.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
