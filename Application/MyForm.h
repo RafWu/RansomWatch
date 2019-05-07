@@ -16,6 +16,8 @@
 #define NUM_THREADS 2
 #define SCAN_PORT L"\\FsFilter"
 
+SCANNER_THREAD_CONTEXT context;
+
 DWORD ScannerWorker(_In_ PSCANNER_THREAD_CONTEXT Context);
 
 namespace AntiRansomWareApp {
@@ -36,8 +38,8 @@ namespace AntiRansomWareApp {
 
 	private: BOOLEAN dragging;
 	private: Point offset;
-	private: HANDLE port;
-	private: HANDLE completion;
+	//public: HANDLE port;
+	//public: HANDLE completion;
 	private: BOOLEAN kernelComOpen;
 	private: void initListenThreads();
 	private: BOOLEAN openKernelDriverCom();
@@ -63,8 +65,8 @@ namespace AntiRansomWareApp {
 			//
 			//TODO: Add the constructor code here
 			//
-			port = nullptr;
-			completion = nullptr;
+			context.Port = nullptr;
+			context.Completion = nullptr;
 			openKernelCommunication();
 
 
@@ -76,8 +78,8 @@ namespace AntiRansomWareApp {
 		/// </summary>
 		~MyForm()
 		{
-			CloseHandle(port);
-			CloseHandle(completion);
+			CloseHandle(context.Port);
+			CloseHandle(context.Completion);
 			if (components)
 			{
 				delete components;

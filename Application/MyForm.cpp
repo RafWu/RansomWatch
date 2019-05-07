@@ -4,6 +4,8 @@
 using namespace System;
 using namespace System::Windows::Forms;
 
+//SCANNER_THREAD_CONTEXT context;
+
 DWORD
 ScannerWorker(
 	_In_ PSCANNER_THREAD_CONTEXT Context
@@ -67,7 +69,7 @@ Return Value
 			break;
 		}
 
-		printf("Received message, size %Id\n", pOvlp->InternalHigh);
+		DBOUT("Received message, size " << pOvlp->InternalHigh << std::endl);
 
 		notification = &message->Notification;
 
@@ -82,12 +84,12 @@ Return Value
 		//  foul language, in which case SafeToOpen should be set to false.
 		//
 
-		printf("PID of the job requested IRP: %d\n", notification->pid);
+		DBOUT("PID of the job requested IRP: " <<  notification->pid << std::endl);
 
 
 		replyMessage.Reply.SafeToOpen = true;
 
-		printf("Replying message, SafeToOpen: %d\n", replyMessage.Reply.SafeToOpen);
+		DBOUT("Replying message, SafeToOpen: " << replyMessage.Reply.SafeToOpen << std::endl);
 
 		hr = FilterReplyMessage(Context->Port,
 			(PFILTER_REPLY_HEADER)&replyMessage,
@@ -95,12 +97,12 @@ Return Value
 
 		if (SUCCEEDED(hr)) {
 
-			printf("Replied message\n");
+			DBOUT("Replied message" <<std::endl);
 
 		}
 		else {
 
-			printf("Scanner: Error replying message. Error = 0x%X\n", hr);
+			DBOUT("Scanner: Error replying message. Error = " <<  hr <<std::endl);
 			break;
 		}
 
@@ -138,6 +140,54 @@ Return Value
 }
 
 void AntiRansomWareApp::MyForm::initListenThreads() {
+	DWORD numOfThreads = NUM_THREADS;
+	PSCANNER_MESSAGE msg;
+	HRESULT hr;
+	//SCANNER_THREAD_CONTEXT context;
+	DWORD threadId;
+	HANDLE threads[NUM_THREADS];
+	//context.Port = port;
+	//context.Completion = completion;
+
+
+	for (DWORD i = 0; i < numOfThreads; i++) {
+		threads[i] = CreateThread(NULL,
+			0,
+			(LPTHREAD_START_ROUTINE)ScannerWorker,
+			&context,
+			0,
+			&threadId);
+		
+		if (threads[i] == NULL) {
+
+			//
+			//  Couldn't create thread.
+			//
+
+			hr = GetLastError();
+			printf("ERROR: Couldn't create thread: %d\n", hr);
+			//goto threadsCleanup;
+		}
+
+#pragma prefast(suppress:__WARNING_MEMORY_LEAK, "msg will not be leaked because it is freed in ScannerWorker")
+		msg = (PSCANNER_MESSAGE)malloc(sizeof(SCANNER_MESSAGE));
+
+		if (msg == nullptr) {
+			hr = ERROR_NOT_ENOUGH_MEMORY;
+			DBOUT("Failed to allocate msg" << std::endl);
+		}
+		memset(&msg->Ovlp, 0, sizeof(OVERLAPPED));
+
+		//
+		//  Request messages from the filter driver.
+		//
+
+		hr = FilterGetMessage(context.Port, &msg->MessageHeader, FIELD_OFFSET(SCANNER_MESSAGE, Ovlp), &msg->Ovlp);
+
+		if (hr != HRESULT_FROM_WIN32(ERROR_IO_PENDING)) {
+			free(msg);
+		}
+	}
 
 }
 
@@ -155,14 +205,13 @@ void AntiRansomWareApp::MyForm::openKernelCommunication() {
 void AntiRansomWareApp::MyForm::closeKernelDriverCom() {
 	if (!kernelComOpen) { std::cerr << "No com to close" << std::endl; return; }
 	// may need to check first kernel driver state, if the driver didnt dissconnect we need to send it a message first
-	CloseHandle(port);
-	CloseHandle(completion);
+	CloseHandle(context.Port);
+	CloseHandle(context.Completion);
 }
 
 BOOLEAN AntiRansomWareApp::MyForm::openKernelDriverCom() {
-	if (port == nullptr) {
-		pin_ptr<HANDLE> portRef = &port;
-		HRESULT resOpen = FilterConnectCommunicationPort(SCAN_PORT, 0, nullptr, 0, nullptr, portRef);
+	if (context.Port == nullptr) {
+		HRESULT resOpen = FilterConnectCommunicationPort(SCAN_PORT, 0, nullptr, 0, nullptr, &context.Port);
 		if (FAILED(resOpen)) { //if open failed
 			std::cerr << "Failed to open mini filter port to driver, please check settings!" << std::endl;
 
@@ -171,16 +220,16 @@ BOOLEAN AntiRansomWareApp::MyForm::openKernelDriverCom() {
 			return false;
 		}
 
-		completion = CreateIoCompletionPort(port,
+		context.Completion = CreateIoCompletionPort(context.Port,
 			nullptr,
 			0,
 			NUM_THREADS);
-		if (completion == nullptr) {
+		if (context.Completion == nullptr) {
 
 			std::cerr << "Failed to create completion port, please check settings!" << std::endl;
 			DWORD err = GetLastError();
 			std::cerr << "Error number: " << err << std::endl;
-			CloseHandle(port);
+			CloseHandle(context.Port);
 			return false;
 		}
 
