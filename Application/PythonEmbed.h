@@ -1,24 +1,20 @@
 #pragma once
 
-#ifndef PYTHONEMBED_H
-#define PYTHONEMBED_H
-#pragma push_macro("slots")
-#pragma push_macro("_DEBUG")
-#undef slots
+// this mess is just to avoid defining of the debug flag in Python.h
+#ifdef _DEBUG
 #undef _DEBUG
 #include <Python.h>
-#pragma pop_macro("_DEBUG")
-#pragma pop_macro("slots")
-#include <any>              // allow variant return type for callFunction
-#include <cstdarg>          // allow unbounded number of arguments to build values
-#include <vector>
-#include <unordered_map>
-#include <string>
-#include <list>             // return values of callFunction are listed
-#include <initializer_list> // allow unbounded number of arguments
+#define _DEBUG
+#else
+#include <Python.h>
+#endif
 
-#pragma comment(lib, "python37")
-#pragma comment(lib, "python3")
+#include <cstdarg>          // allow unbounded number of arguments to build values
+#include <string>
+#include <unordered_map>    // store modules
+#include <vector>           // return value of callFunction is vectorized if number of values > 1
+#include <any>              // allow variant return type
+#include <initializer_list> // allow unbounded number of arguments
 
 
 // TODO? replace THROW macro with a formater for exceptions
@@ -35,7 +31,6 @@
 
 // TODO: C++ wrapper to PyObject that allows auto conversion to C++ objects
 //       and manages memory
-
 
 class CPPython {
 private:
@@ -61,7 +56,7 @@ private:
 	};
 
 	// Returns the type of a PyObject
-	static PyType getPyType(PyObject * object) {
+	static PyType getPyType(PyObject* object) {
 		static const char rname[] = "CPPython::getPyType";
 
 		if (!object) {
@@ -100,7 +95,7 @@ private:
 	}
 
 	// Returns the C++ equivalent of a primitive PyObject
-	static std::any getPrimitive(PyObject * object) {
+	static std::any getPrimitive(PyObject* object) {
 		static const char rname[] = "CPPython::getPrimitive";
 
 		PyType type = getPyType(object);
@@ -113,7 +108,7 @@ private:
 			return PyObject_IsTrue(object) ? true : false;
 		case String:
 		{
-			wchar_t * ws = PyUnicode_AsWideCharString(object, 0);
+			wchar_t* ws = PyUnicode_AsWideCharString(object, 0);
 			if (!ws) {
 				THROW(std::runtime_error, "%s: Could not allocate wchat_t*.", rname);
 			}
@@ -130,7 +125,7 @@ private:
 	}
 
 	// Returns true if a PyObject is primitive, false otherwise
-	static bool isPrimitiveType(PyObject * object) {
+	static bool isPrimitiveType(PyObject* object) {
 		PyType type = getPyType(object);
 		return type == Long || type == Float || type == Boolean || type == String || type == None;
 	}
@@ -138,7 +133,7 @@ private:
 	// Courtesy of Python source code.
 	// Returns the number of argument to expect in a va_list
 	// (or -1 in failure).
-	static Py_ssize_t countformat(const char *format, char endchar) {
+	static Py_ssize_t countformat(const char* format, char endchar) {
 		Py_ssize_t count = 0;
 		int level = 0;
 		while (level > 0 || *format != endchar) {
@@ -180,7 +175,7 @@ private:
 
 	// Returns the C++ equivalent of a PyObject (primitive or non-primitive)
 	// borrows PyObject
-	static std::any parsePyObject(PyObject * object) {
+	static std::any parsePyObject(PyObject* object) {
 		static const char rname[] = "CPPython::parsePyObject";
 
 		if (!object) {
@@ -200,7 +195,7 @@ private:
 		std::vector<std::any> retval;
 		retval.reserve(size);
 		for (Py_ssize_t i = 0; i < size; ++i) {
-			PyObject * pValue = (type == Tuple) ? PyTuple_GetItem(object, i) : PyList_GetItem(object, i);
+			PyObject* pValue = (type == Tuple) ? PyTuple_GetItem(object, i) : PyList_GetItem(object, i);
 			// pValue is borrowed, so no need to handle reference count
 			if (!pValue) {
 				THROW(std::runtime_error, "%s: object is NULL in index (%zd)", rname, i);
@@ -224,6 +219,7 @@ public:
 
 	CPPython() {
 		if (!(refcount++)) {
+			Py_SetPythonHome(L"Python37");
 			Py_Initialize();
 		}
 	}
@@ -233,7 +229,7 @@ public:
 	//  - paths: absolute paths in which modules resides.
 	explicit CPPython(std::initializer_list<std::wstring> pNames, std::initializer_list<std::wstring> paths = {}) {
 		if (!(refcount++)) {
-			Py_NoSiteFlag = 1;
+			Py_SetPythonHome(L"Python37");
 			Py_Initialize();
 		}
 
@@ -241,7 +237,7 @@ public:
 			addModulePath(paths);
 			loadModule(pNames);
 		}
-		catch (std::exception& e) {
+		catch (std::exception & e) {
 			if (!(--refcount)) {
 				Py_FinalizeEx();
 				// Py_FinalizeEx can fail.
@@ -279,12 +275,12 @@ public:
 		}
 
 		for (auto& _pName : pNames) {
-			PyObject * pName = PyUnicode_FromWideChar(_pName.c_str(), _pName.size());
+			PyObject* pName = PyUnicode_FromWideChar(_pName.c_str(), _pName.size());
 			if (!pName) {
 				THROW(std::runtime_error, "%s: Python interpeter not initialized.", rname);
 			}
 
-			PyObject * pModule = PyImport_Import(pName);
+			PyObject* pModule = PyImport_Import(pName);
 			Py_DECREF(pName);
 			if (!pModule) {
 				// TODO: log module not found.
@@ -309,12 +305,12 @@ public:
 		}
 
 		for (auto& absPath : absPaths) {
-			PyObject * sysPath = PySys_GetObject("path");
+			PyObject* sysPath = PySys_GetObject("path");
 			if (!sysPath) {
 				THROW(std::runtime_error, "%s: Could not get system path.", rname);
 			}
 
-			PyObject * pPath = PyUnicode_FromWideChar(absPath.c_str(), absPath.size());
+			PyObject* pPath = PyUnicode_FromWideChar(absPath.c_str(), absPath.size());
 			if (!pPath) {
 				THROW(std::runtime_error, "%s: Could not convert path string to PyUnicode.", rname);
 			}
@@ -335,7 +331,7 @@ public:
 	//  - fmt, ...: C Arguments for _funcName. The C arguments are described using
 	//              a Py_BuildValue() style format string:
 	//              http://dbpubs.stanford.edu:8091/~testbed/python/manual.1.4/ext/node11.html
-	any callFunction(const std::wstring& _modName, const std::wstring& _funcName, const char * fmt = "", ...) {
+	any callFunction(const std::wstring& _modName, const std::wstring& _funcName, const char* fmt = "", ...) {
 		static const char rname[] = "CPPython::callFunction";
 
 		if (pModules.find(_modName) == pModules.cend()) {
@@ -343,17 +339,17 @@ public:
 		}
 
 		// get the function from module
-		PyObject * pFuncName = PyUnicode_FromWideChar(_funcName.c_str(), _funcName.size());
+		PyObject* pFuncName = PyUnicode_FromWideChar(_funcName.c_str(), _funcName.size());
 		if (!pFuncName) {
 			THROW(std::runtime_error, "%s: Could not build function name.", rname);
 		}
 
-		PyObject * pDict = PyModule_GetDict(pModules.at(_modName));
+		PyObject* pDict = PyModule_GetDict(pModules.at(_modName));
 		if (!pDict) {
 			THROW(std::runtime_error, "%s: Could not get module dictionary.", rname);
 		}
 
-		PyObject * pFunc = PyDict_GetItem(pDict, pFuncName);
+		PyObject* pFunc = PyDict_GetItem(pDict, pFuncName);
 		if (!pFunc) {
 			THROW(std::runtime_error, "%s: function name is not present in the module dictionary.", rname);
 		}
@@ -363,7 +359,7 @@ public:
 
 		if (pFunc && PyCallable_Check(pFunc)) {
 			// build the PyObject arguments to the function
-			PyObject * pArgs;
+			PyObject* pArgs;
 			va_list va;
 			Py_ssize_t n = countformat(fmt, '\0');
 			if (n < 0) {
@@ -376,7 +372,7 @@ public:
 			else if (n == 1) {
 				pArgs = PyTuple_New(1);
 				va_start(va, fmt);
-				PyObject * pValue = Py_VaBuildValue(fmt, va);
+				PyObject* pValue = Py_VaBuildValue(fmt, va);
 				if (!pValue) {
 					Py_DECREF(pArgs);
 					THROW(std::runtime_error, "%s: Could not build function arguments.", rname);
@@ -398,7 +394,7 @@ public:
 			}
 
 			// call pFunc with pArgs
-			PyObject * pValue = PyObject_CallObject(pFunc, pArgs);
+			PyObject* pValue = PyObject_CallObject(pFunc, pArgs);
 			Py_DECREF(pArgs);
 			if (!pValue) {
 				THROW(std::runtime_error, "%s: pValue is NULL. PyObject_CallObject failed.", rname);
@@ -427,5 +423,3 @@ public:
 		return std::any_cast<T>(p);
 	}
 };
-
-#endif // PYTHONEMBED_H
