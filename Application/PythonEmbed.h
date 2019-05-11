@@ -25,7 +25,7 @@
                                 } while(0)
 
 // TODO: make the class thread-safe, since now multiple instances
-//       sof the class can mess things up, because Py_Initialize
+//       of the class can mess things up, because Py_Initialize
 //       and Py_FinalizeEx should be called only once per thread
 //       (I mean... TODO only if this is actually needed)
 
@@ -405,7 +405,7 @@ public:
 			try {
 				retval = parsePyObject(pValue);
 			}
-			catch (std::exception & e) {
+			catch (std::exception& e) {
 				Py_DECREF(pValue);
 				throw e;
 			}
