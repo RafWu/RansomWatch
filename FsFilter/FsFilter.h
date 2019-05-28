@@ -17,95 +17,33 @@ Environment:
 --*/
 
 #include <fltKernel.h>
+#include <ntddk.h>
+#include <wdm.h>
 #include <dontuse.h>
 #include <suppress.h>
-#include "ukshared.h"
+#include <ntstrsafe.h>
+#include "KernelString.h"
+#include "../SharedDefs/SharedDefs.h"
+#include "Communication.h"
+#include "DriverData.h"
+#include "ShanonEntropy.h"
 
-#define SCAN_PORT L"\\FsFilter"
-
-//
-//  The global variable
-//
-
-typedef struct _FSFILTER_GLOBAL_DATA {
-
-	//  The object that identifies this driver.
-
-	PDRIVER_OBJECT DriverObject;
-
-	//  The filter handle that results from a call to
-
-	PFLT_FILTER Filter;
-
-	//  Server-side communicate ports.
-
-	PFLT_PORT ServerPort;
-
-	//  port for a connection to user-mode
-
-	PFLT_PORT ClientPort;
-	
-	//  User process that connected to the port
-
-	PEPROCESS UserProcess;
-	
-	//  A flag that indicating that the filter is being unloaded.
-
-
-	BOOLEAN  Unloading;
-} GLOBAL_DATA, *PGLOBAL_DATA;
-
-
-extern GLOBAL_DATA globalData;
-
-typedef struct _SCANNER_STREAM_HANDLE_CONTEXT {
-
-	BOOLEAN RescanRequired;
-
-} SCANNER_STREAM_HANDLE_CONTEXT, *PSCANNER_STREAM_HANDLE_CONTEXT;
-
-#pragma warning(push)
-#pragma warning(disable:4200) // disable warnings for structures with zero length arrays.
-
-typedef struct _SCANNER_CREATE_PARAMS {
-
-	WCHAR String[0];
-
-} SCANNER_CREATE_PARAMS, *PSCANNER_CREATE_PARAMS;
-
-#pragma warning(pop)
-
-
-///////////////////////////////////////////////////////////////////////////
-//
-//  Prototypes for the startup and unload routines used for 
-//  this Filter.
-//
-//  Implementation in scanner.c
-//
-///////////////////////////////////////////////////////////////////////////
-
-DRIVER_INITIALIZE DriverEntry;
-NTSTATUS
-DriverEntry(
-	_In_ PDRIVER_OBJECT DriverObject,
-	_In_ PUNICODE_STRING RegistryPath
-);
 
 NTSTATUS
 FSUnloadDriver(
 	_In_ FLT_FILTER_UNLOAD_FLAGS Flags
 );
 
-FLT_PREOP_CALLBACK_STATUS
-FSPreCreate(
+FLT_POSTOP_CALLBACK_STATUS
+FSPostReadOperation(
 	_Inout_ PFLT_CALLBACK_DATA Data,
 	_In_ PCFLT_RELATED_OBJECTS FltObjects,
-	_Flt_CompletionContext_Outptr_ PVOID *CompletionContext
+	_In_opt_ PVOID CompletionContext,
+	_In_ FLT_POST_OPERATION_FLAGS Flags
 );
 
 FLT_POSTOP_CALLBACK_STATUS
-FSPostCreate(
+FSPostOperation(
 	_Inout_ PFLT_CALLBACK_DATA Data,
 	_In_ PCFLT_RELATED_OBJECTS FltObjects,
 	_In_opt_ PVOID CompletionContext,
@@ -113,27 +51,91 @@ FSPostCreate(
 );
 
 FLT_PREOP_CALLBACK_STATUS
-FSPreCleanup(
+FSPreOperation(
 	_Inout_ PFLT_CALLBACK_DATA Data,
 	_In_ PCFLT_RELATED_OBJECTS FltObjects,
 	_Flt_CompletionContext_Outptr_ PVOID *CompletionContext
 );
 
-FLT_PREOP_CALLBACK_STATUS
-FSPreWrite(
+NTSTATUS
+FSInstanceSetup(
+	_In_ PCFLT_RELATED_OBJECTS FltObjects,
+	_In_ FLT_INSTANCE_SETUP_FLAGS Flags,
+	_In_ DEVICE_TYPE VolumeDeviceType,
+	_In_ FLT_FILESYSTEM_TYPE VolumeFilesystemType
+);
+
+NTSTATUS
+FSInstanceQueryTeardown(
+	_In_ PCFLT_RELATED_OBJECTS FltObjects,
+	_In_ FLT_INSTANCE_QUERY_TEARDOWN_FLAGS Flags
+);
+
+VOID
+FSInstanceTeardownStart(
+	_In_ PCFLT_RELATED_OBJECTS FltObjects,
+	_In_ FLT_INSTANCE_TEARDOWN_FLAGS Flags
+);
+
+VOID
+FSInstanceTeardownComplete(
+	_In_ PCFLT_RELATED_OBJECTS FltObjects,
+	_In_ FLT_INSTANCE_TEARDOWN_FLAGS Flags
+);
+
+NTSTATUS
+FSProcessPreOperartion(
 	_Inout_ PFLT_CALLBACK_DATA Data,
 	_In_ PCFLT_RELATED_OBJECTS FltObjects,
 	_Flt_CompletionContext_Outptr_ PVOID *CompletionContext
 );
 
-#if (WINVER >= 0x0602)
-
-FLT_PREOP_CALLBACK_STATUS
-FSPreFileSystemControl(
-	_Inout_ PFLT_CALLBACK_DATA Data,
-	_In_ PCFLT_RELATED_OBJECTS FltObjects,
-	_Flt_CompletionContext_Outptr_ PVOID *CompletionContext
+NTSTATUS
+FSEntrySetFileName(
+	const PFLT_VOLUME volume,
+	PFLT_FILE_NAME_INFORMATION nameInfo,
+	PUNICODE_STRING uString
 );
 
-#endif
+FLT_POSTOP_CALLBACK_STATUS
+FSProcessPostReadIrp(
+	_Inout_ PFLT_CALLBACK_DATA Data,
+	_In_ PCFLT_RELATED_OBJECTS FltObjects,
+	_In_opt_ PVOID CompletionContext,
+	_In_ FLT_POST_OPERATION_FLAGS Flags
+);
 
+FLT_POSTOP_CALLBACK_STATUS
+FSProcessPostReadSafe(
+	_Inout_ PFLT_CALLBACK_DATA Data,
+	_In_ PCFLT_RELATED_OBJECTS FltObjects,
+	_In_opt_ PVOID CompletionContext,
+	_In_ FLT_POST_OPERATION_FLAGS Flags
+);
+
+FLT_POSTOP_CALLBACK_STATUS
+FSProcessCreateIrp(
+	_Inout_ PFLT_CALLBACK_DATA Data,
+	_In_ PCFLT_RELATED_OBJECTS FltObjects
+);
+
+BOOLEAN
+FSIsFileNameInScanDirs(
+	CONST LPCWSTR path
+);
+
+typedef NTSTATUS(*QUERY_INFO_PROCESS) (
+	__in HANDLE ProcessHandle,
+	__in PROCESSINFOCLASS ProcessInformationClass,
+	__out_bcount(ProcessInformationLength) PVOID ProcessInformation,
+	__in ULONG ProcessInformationLength,
+	__out_opt PULONG ReturnLength
+	);
+
+QUERY_INFO_PROCESS ZwQueryInformationProcess;
+
+NTSTATUS
+GetProcessImageName(
+	PEPROCESS eProcess,
+	PUNICODE_STRING ProcessImageName
+);

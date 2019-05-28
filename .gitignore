@@ -259,3 +259,10 @@ paket-files/
 # Python Tools for Visual Studio (PTVS)
 __pycache__/
 *.pyc
+/Application/Python37/Lib/encodings
+/Application/Python37/Lib/importlib
+/Application/Python37/Lib/collections
+/Application/Python37/Lib
+
+# Custom
+*.exe
