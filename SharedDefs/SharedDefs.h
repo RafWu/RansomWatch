@@ -86,7 +86,7 @@ typedef struct _AMF_IRP_OP {
 
 typedef struct _AMF_REPLY_IRPS {
 	size_t dataSize; // 8 bytes
-	PDRIVER_MESSAGE data; //points to the first IRP driver message, we use as an array with num_ops values, 8 bytes
+	PDRIVER_MESSAGE data; // 8 bytes points to the first IRP driver message, the next DRIVER_MESSAGE is a pointer inside DRIVER_MESSAGE
 	ULONGLONG num_ops; // 8 bytes
 	
 	size_t size() {
@@ -105,3 +105,5 @@ typedef struct _AMF_REPLY_IRPS {
 	}
 
 } AMF_REPLY_IRPS, *PAMF_REPLY_IRPS;
+
+constexpr ULONG MAX_COMM_BUFFER_SIZE = sizeof(AMF_REPLY_IRPS) + MAX_IRP_OPS_PER_REQUEST * sizeof(DRIVER_MESSAGE);

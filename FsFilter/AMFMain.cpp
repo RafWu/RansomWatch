@@ -842,6 +842,7 @@ FSProcessPostReadSafe(
 
 	NTSTATUS status = STATUS_SUCCESS;
 	PIRP_ENTRY entry = (PIRP_ENTRY)CompletionContext;
+	ASSERT(entry != nullptr);
 	status = FltLockUserBuffer(Data);
 	if (NT_SUCCESS(status))
 	{

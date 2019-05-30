@@ -243,14 +243,14 @@ BOOLEAN TrapHandler::TrapGenerate(const fs::path& directory) {
 
 
 		if (trapHandle != INVALID_HANDLE_VALUE) {
-			if (SetFileTime(trapHandle, &time, &time, &time)) {
-				DBOUT("Failed to set rand time for trap" << std::endl);
+			//size = 20;
+			FillRandContent(trapHandle, size);
+			if (!SetFileTime(trapHandle, &time, &time, &time)) {
+				DBOUT("Failed to set rand time for trap" << GetLastError() << std::endl);
 			}
 
 		}
-		//size = 20;
-		FillRandContent(trapHandle, size);
-
+		
 		for (auto handle : vHandles) {
 			CloseHandle(handle);
 		}

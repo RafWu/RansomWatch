@@ -26,7 +26,7 @@ Return Value
 	ULONG IrpCount = 0;
 	ULONGLONG TotalIrpCount = 0;
 	/*create buffer*/
-	CONST DWORD BufferSize = sizeof(AMF_REPLY_IRPS) + MAX_IRP_OPS_PER_REQUEST * sizeof(DRIVER_MESSAGE);
+	CONST DWORD BufferSize = MAX_COMM_BUFFER_SIZE;
 	PBYTE Buffer = new BYTE[BufferSize]; // prepare space for message header reply and 10 messages
 	COM_MESSAGE GetIrpMsg;
 	GetIrpMsg.type = MESSAGE_GET_OPS;
