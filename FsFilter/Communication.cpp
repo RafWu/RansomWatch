@@ -153,49 +153,57 @@ NTSTATUS AMFNewMessage(
 		if (!NT_SUCCESS(hr)) {
 			return STATUS_INTERNAL_ERROR;
 		}
+		*ReturnOutputBufferLength = 1;
 		if (driverData->AddDirectoryEntry(newEntry)) {
-			if (OutputBuffer != NULL && OutputBufferLength > 0) {
+			/*if (OutputBuffer != NULL && OutputBufferLength > 0) {
 				swprintf_s((WCHAR*)OutputBuffer, (size_t)OutputBufferLength, L"Added scan directory \"%ls\"", message->path);
 				*ReturnOutputBufferLength = (ULONG)wcsnlen_s((WCHAR*)OutputBuffer, static_cast<size_t>(OutputBufferLength)) + 1;
-			}
+			}*/
+			*((PBOOLEAN)OutputBuffer) = TRUE;
 			DbgPrint("Added scan directory successfully\n");
 			return STATUS_SUCCESS;
 		}
 		else {
 			delete newEntry;
-			if (OutputBuffer != NULL && OutputBufferLength > 0) {
+			/*if (OutputBuffer != NULL && OutputBufferLength > 0) {
 				swprintf_s((WCHAR*)OutputBuffer, (size_t)OutputBufferLength, L"Failed to add directory \"%ls\"", message->path);
 				*ReturnOutputBufferLength = (ULONG)wcsnlen_s((WCHAR*)OutputBuffer, static_cast<size_t>(OutputBufferLength)) + 1;
-			}
+			}*/
+			*((PBOOLEAN)OutputBuffer) = FALSE;
 			DbgPrint("Failed to addscan directory\n");
-			return STATUS_INVALID_PARAMETER;
+			return STATUS_SUCCESS;
 		}
 		
 	}
 	else if (message->type == MESSAGE_REM_SCAN_DIRECTORY) {
 		PDIRECTORY_ENTRY ptr = driverData->RemDirectoryEntry(message->path);
+		*ReturnOutputBufferLength = 1;
 		if (ptr == NULL) {
-			if (OutputBuffer != NULL && OutputBufferLength > 0) {
+			/*if (OutputBuffer != NULL && OutputBufferLength > 0) {
 				swprintf_s((WCHAR*)OutputBuffer, (size_t)OutputBufferLength, L"Failed to remove directory \"%ls\"", message->path);
 				*ReturnOutputBufferLength = (ULONG)wcsnlen_s((WCHAR*)OutputBuffer, static_cast<size_t>(OutputBufferLength)) + 1;
-			}
+			}*/
+			*((PBOOLEAN)OutputBuffer) = FALSE;
 			DbgPrint("Failed to remove directory\n");
-			return STATUS_INVALID_PARAMETER;
+			return STATUS_SUCCESS;
 		}
 		else {
 			delete ptr;
-			if (OutputBuffer != NULL && OutputBufferLength > 0) {
+			/*(if (OutputBuffer != NULL && OutputBufferLength > 0) {
 				swprintf_s((WCHAR*)OutputBuffer, (size_t)OutputBufferLength, L"Removed directory \"%ls\"", message->path);
 				*ReturnOutputBufferLength = (ULONG)wcsnlen_s((WCHAR*)OutputBuffer, static_cast<size_t>(OutputBufferLength)) + 1;
-			}
+			}*/
 		}
+		*((PBOOLEAN)OutputBuffer) = TRUE;
 		DbgPrint("Removed scan directory successfully\n");
 		return STATUS_SUCCESS;
 	}
 	else if (message->type == MESSAGE_GET_OPS) {
-		if (OutputBuffer == NULL || OutputBufferLength == 0) {
+		if (OutputBuffer == NULL || OutputBufferLength != MAX_COMM_BUFFER_SIZE) {
 			return STATUS_INVALID_PARAMETER;
 		}
+		return driverData->DriverGetIrps(OutputBuffer, OutputBufferLength, ReturnOutputBufferLength);
+
 	}
 	else if (message->type == MESSAGE_SET_PID) {
 		if (message->pid != 0) {
@@ -204,6 +212,50 @@ NTSTATUS AMFNewMessage(
 		}
 		return STATUS_INVALID_PARAMETER;
 		
+	}
+	else if (message->type == MESSAGE_KILL_PID) {
+		NTSTATUS status = STATUS_SUCCESS;
+		HANDLE processHandle;
+		ULONG PID = message->pid;
+
+		/* following code may be wrong*/
+		CLIENT_ID clientId;
+		clientId.UniqueProcess = &PID;
+		clientId.UniqueThread = &PID;
+
+		OBJECT_ATTRIBUTES objAttribs;
+		NTSTATUS exitStatus = STATUS_FAIL_CHECK;
+		
+		if (OutputBuffer == NULL || OutputBufferLength != sizeof(LONG)) {
+			return STATUS_INVALID_PARAMETER;
+		}
+
+		*ReturnOutputBufferLength = sizeof(LONG);
+
+		InitializeObjectAttributes(&objAttribs,
+			NULL,
+			OBJ_KERNEL_HANDLE,
+			NULL,
+			NULL);
+
+		status = ZwOpenProcess(&processHandle,
+				PROCESS_ALL_ACCESS,
+				&objAttribs,
+				&clientId);
+		if (!NT_SUCCESS(status)) {
+			*((PLONG)OutputBuffer) = status; // fail
+			return STATUS_SUCCESS; // we dont fail code we notify back a failure
+		}
+		
+		status = ZwTerminateProcess(processHandle, exitStatus);
+		if (NT_SUCCESS(status)) {
+			*((PLONG)OutputBuffer) = status; // success we can close handle
+			status = NtClose(processHandle);
+			return status; // we dont fail code we notify back a failure
+		}
+		DbgPrint("Failed to kill a process\n");
+		*((PLONG)OutputBuffer) = status; // fail to kill process
+		return STATUS_SUCCESS;
 	}
 
 	return STATUS_INTERNAL_ERROR;

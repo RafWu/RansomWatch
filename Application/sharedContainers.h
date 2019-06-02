@@ -76,6 +76,8 @@ ref struct ProcessRecord {
 	BOOLEAN AddIrpRecord(const DRIVER_MESSAGE& Irp) {
 		Monitor::Enter(this);
 		// FIXME: add to fields, check file id and add to new file accordingly
+		DBOUT("Recived irp: " << Irp.IRP_OP << " process pid: " << Irp.PID);
+		
 		Monitor::Exit(this);
 		return TRUE;
 	}
@@ -155,11 +157,20 @@ private:
 	BOOLEAN isisMonitorStopped = FALSE;
 	BOOLEAN isCommClosed = TRUE;
 	ULONGLONG TotalIrpsHandled = 0;
+public: System::Windows::Forms::TextBox^ logView;
 
 public:
 	static property Globals^ Instance
 	{
 		Globals^ get() { return m_Instance; }
+	}
+
+	void setTextBox(System::Windows::Forms::TextBox^ logViewer) {
+		logView = logViewer;
+	}
+
+	System::Windows::Forms::TextBox^ getTextBox() {
+		return logView;
 	}
 
 	ULONGLONG addIrpHandled(ULONGLONG num) {

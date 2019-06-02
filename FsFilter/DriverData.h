@@ -50,7 +50,7 @@ public:
 
 		KIRQL irql = KeGetCurrentIrql();
 		KeAcquireSpinLock(&irpOpsLock, &irql);
-		if (irpOpsSize < 0x4000) { // TODO : to define in sharedDefs
+		if (irpOpsSize < 0x9000) { // TODO : to define in sharedDefs
 			irpOpsSize++;
 			InsertTailList(&irpOps, &newEntry->entry);
 		}
@@ -88,6 +88,46 @@ public:
 		return (PIRP_ENTRY)CONTAINING_RECORD(ret, IRP_ENTRY, entry);
 	}
 
+
+	NTSTATUS DriverGetIrps(PVOID Buffer, ULONG BufferSize, PULONG ReturnOutputBufferLength) {
+		*ReturnOutputBufferLength = sizeof(AMF_REPLY_IRPS);
+		PUCHAR OutputBuffer = (PUCHAR)Buffer;
+		ULONG SizeBuffRemain = BufferSize - sizeof(AMF_REPLY_IRPS);
+		ULONG BufferByteIndex = sizeof(AMF_REPLY_IRPS);
+		AMF_REPLY_IRPS outHeader;
+		PLIST_ENTRY irpEntryList;
+		NTSTATUS hr = STATUS_SUCCESS;
+		
+		KIRQL irql = KeGetCurrentIrql();
+		KeAcquireSpinLock(&irpOpsLock, &irql);
+
+		while (irpOpsSize && SizeBuffRemain >= sizeof(DRIVER_MESSAGE)) {
+			irpEntryList = RemoveHeadList(&irpOps);
+			irpOpsSize--;
+			PIRP_ENTRY irp = (PIRP_ENTRY)CONTAINING_RECORD(irpEntryList, IRP_ENTRY, entry);
+			RtlCopyMemory(OutputBuffer + BufferByteIndex, &(irp->data), sizeof(DRIVER_MESSAGE));
+			delete irp;
+			BufferByteIndex += sizeof(DRIVER_MESSAGE);
+			SizeBuffRemain -= sizeof(DRIVER_MESSAGE);
+			outHeader.addOp();
+			outHeader.addSize(sizeof(DRIVER_MESSAGE));
+			*ReturnOutputBufferLength += sizeof(DRIVER_MESSAGE);
+
+
+		}
+
+		KeReleaseSpinLock(&irpOpsLock, irql);
+
+		if (outHeader.numOps()) {
+			outHeader.data = PDRIVER_MESSAGE(OutputBuffer + sizeof(AMF_REPLY_IRPS));
+		}
+		
+		RtlCopyMemory(OutputBuffer, &(outHeader), sizeof(AMF_REPLY_IRPS));
+		
+		
+		return hr;
+	}
+
 	LIST_ENTRY GetAllEntries()
 	{
 		LIST_ENTRY newList;
@@ -106,7 +146,7 @@ public:
 		BOOLEAN ret = FALSE;
 		BOOLEAN foundMatch = FALSE;
 		KIRQL irql = KeGetCurrentIrql();
-		KeAcquireSpinLock(&irpOpsLock, &irql);
+		KeAcquireSpinLock(&directoriesSpinLock, &irql);
 
 		PLIST_ENTRY pEntry = rootDirectories.Flink;
 		while (pEntry != &rootDirectories)
@@ -172,8 +212,8 @@ public:
 	/**
 		IsContainingDirectory returns true if one of the directory entries in our LIST_ENTRY of PDIRECTORY_ENTRY is in the path passed as param
 	*/
-	BOOLEAN IsContainingDirectory(CONST LPCWSTR path) {
-		if (path == NULL || path[0] != L'\0') return FALSE;
+	BOOLEAN IsContainingDirectory(CONST PUNICODE_STRING path) {
+		if (path == NULL || path->Buffer == NULL) return FALSE;
 		BOOLEAN ret = FALSE;
 		KIRQL irql = KeGetCurrentIrql();
 		//DbgPrint("Looking for path: %ls in lookup dirs", path);
@@ -182,7 +222,22 @@ public:
 			PLIST_ENTRY pEntry = rootDirectories.Flink;
 			while (pEntry != &rootDirectories) {
 				PDIRECTORY_ENTRY pStrct = (PDIRECTORY_ENTRY)CONTAINING_RECORD(pEntry, DIRECTORY_ENTRY, entry);
-				ret = (wcsstr(path, pStrct->path) != NULL);
+				for (ULONG i = 0; i < path->Length; i++) {
+					if (pStrct->path[i] == L'\0') {
+						ret = TRUE; 
+						break;
+					}
+
+					else if (pStrct->path[i] == path->Buffer[i]) {
+						continue;
+					}
+					else {
+						break; // for loop
+					}
+				}
+				
+				
+				//ret = (wcsstr(path, pStrct->path) != NULL);
 				if (ret) break;
 				//Move to next Entry in list.
 				pEntry = pEntry->Flink;
@@ -191,7 +246,7 @@ public:
 		KeReleaseSpinLock(&directoriesSpinLock, irql);
 		return ret;
 	}
-	/*
+
 	void Clear() {
 		KIRQL irql = KeGetCurrentIrql();
 		KeAcquireSpinLock(&directoriesSpinLock, &irql);
@@ -220,7 +275,7 @@ public:
 		InitializeListHead(&irpOps);
 		KeReleaseSpinLock(&irpOpsLock, irql);
 
-	}*/
+	}
 };
 
 extern DriverData* driverData;

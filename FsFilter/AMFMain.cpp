@@ -492,12 +492,12 @@ FSProcessPreOperartion(
 		DbgPrint("!!! FSFilter: Failed to set file name on irp\n");
 		delete newEntry;
 		return hr;
-	}/*
-	if (!FSIsFileNameInScanDirs(FilePath)) {
+	}
+	if (!FSIsFileNameInScanDirs(&FilePath)) {
 		DbgPrint("!!! FSFilter: Skipping uninterented file, not in scan area \n");
 		delete newEntry;
 		return FLT_PREOP_SUCCESS_NO_CALLBACK;
-	}*/
+	}
 	FSFreeUnicodeString(&FilePath);
 
 	hr = FLT_PREOP_SUCCESS_NO_CALLBACK;
@@ -730,12 +730,12 @@ FSProcessCreateIrp(
 		DbgPrint("!!! FSFilter: Failed to set file name on irp\n");
 		delete newEntry;
 		return FLT_POSTOP_FINISHED_PROCESSING;
-	}/*
-	if (!FSIsFileNameInScanDirs(FilePath)) {
+	}
+	if (!FSIsFileNameInScanDirs(&FilePath)) {
 		DbgPrint("!!! FSFilter: Skipping uninterented file, not in scan area \n");
 		delete newEntry;
-		return FLT_PREOP_SUCCESS_NO_CALLBACK;
-	}*/
+		return FLT_POSTOP_FINISHED_PROCESSING;
+	}
 	
 	// reset entropy
 	newItem->FileChange = FILE_CHANGE_NOT_SET;
@@ -873,7 +873,7 @@ FSProcessPostReadSafe(
 
 BOOLEAN
 FSIsFileNameInScanDirs(
-	CONST LPCWSTR path
+	CONST PUNICODE_STRING path
 ) 
 {
 	//ASSERT(driverData != NULL);

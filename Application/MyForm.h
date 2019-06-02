@@ -62,6 +62,7 @@ namespace AntiRansomWareApp {
 			//TODO: Add the constructor code here
 			//
 			context.Port = nullptr;
+			Globals::Instance->setTextBox(logViewer);
 			//context.Completion = nullptr;
 			openKernelCommunication();
 
@@ -352,6 +353,7 @@ private: System::Void SelectAddRootDir_Click(System::Object^  sender, System::Ev
 			if (hr == S_OK) {
 				String^ logSuccess = gcnew String("<E> Added filter directory: ");
 				String^ logMsgSuc = String::Concat(logSuccess, selectedDir);
+				
 				logViewer->AppendText(logMsgSuc);
 			}
 			else {

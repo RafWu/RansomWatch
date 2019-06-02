@@ -121,7 +121,7 @@ FSProcessCreateIrp(
 
 BOOLEAN
 FSIsFileNameInScanDirs(
-	CONST LPCWSTR path
+	CONST PUNICODE_STRING path
 );
 
 typedef NTSTATUS(*QUERY_INFO_PROCESS) (

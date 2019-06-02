@@ -51,7 +51,8 @@ void AntiRansomWareApp::MyForm::openKernelCommunication() {
 		setPidMsg.type = MESSAGE_SET_PID;
 		setPidMsg.pid = GetCurrentProcessId();
 		setPidMsg.path[0] = L'\0';
-		HRESULT hr = FilterSendMessage(context.Port, &setPidMsg, sizeof(COM_MESSAGE), NULL, 0, NULL);
+		DWORD tmp;
+		HRESULT hr = FilterSendMessage(context.Port, &setPidMsg, sizeof(COM_MESSAGE), NULL, 0, &tmp);
 		if (FAILED(hr)) {
 			DBOUT("Failed to send set pid message, cancel kernel comm" << std::endl);
 			closeKernelDriverCom();
@@ -103,7 +104,8 @@ HRESULT AntiRansomWareApp::MyForm::RemoveFilterDirectory(String ^ directory)
 	wcsncpy_s(setDirMsg.path, MAX_FILE_NAME_LENGTH, Path.c_str(), MAX_FILE_NAME_LENGTH);
 	HRESULT hr = FilterSendMessage(context.Port, &setDirMsg, sizeof(COM_MESSAGE), &retOp, 1, &retSize);
 	if (FAILED(hr)) {
-		DBOUT("Failed to send rem dir message" << std::endl);
+		DBOUT("Failed to send rem dir message" << hr << GetLastError() << std::endl);
+
 		Globals::Instance->setCommCloseStat(TRUE);
 		return S_FALSE;
 	}
@@ -118,6 +120,7 @@ HRESULT AntiRansomWareApp::MyForm::RemoveFilterDirectory(String ^ directory)
 HRESULT AntiRansomWareApp::MyForm::AddFilterDirectory(String ^ directory)
 {
 	if (Globals::Instance->getCommCloseStat() || context.Port == nullptr) { // no comm
+		logViewer->AppendText("Comm closed\n");
 		return S_FALSE;
 	}
 	else if (directory == nullptr) {
@@ -140,7 +143,12 @@ HRESULT AntiRansomWareApp::MyForm::AddFilterDirectory(String ^ directory)
 		Globals::Instance->setCommCloseStat(TRUE);
 		return S_FALSE;
 	}
-	else if (retSize == 1 && retOp == TRUE) { //reply op
+	
+	System::String^ pre = "<I> added irps so far: ";
+	System::String^ msg = System::String::Concat(pre, Globals::Instance->getIrpHandled().ToString());
+	msg = System::String::Concat(msg, "\n");
+	logViewer->AppendText(msg);
+	if (retSize == 1 && retOp == TRUE) { //reply op
 		return S_OK;
 	}
 

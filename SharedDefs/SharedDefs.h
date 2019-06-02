@@ -103,7 +103,9 @@ typedef struct _AMF_REPLY_IRPS {
 	ULONGLONG numOps() {
 		return num_ops;
 	}
+	_AMF_REPLY_IRPS() : dataSize(sizeof(_AMF_REPLY_IRPS)), data(nullptr), num_ops(0){
 
+	}
 } AMF_REPLY_IRPS, *PAMF_REPLY_IRPS;
 
 constexpr ULONG MAX_COMM_BUFFER_SIZE = sizeof(AMF_REPLY_IRPS) + MAX_IRP_OPS_PER_REQUEST * sizeof(DRIVER_MESSAGE);

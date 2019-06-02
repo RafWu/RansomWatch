@@ -39,6 +39,7 @@ Return Value
 		hr = FilterSendMessage(Port, &GetIrpMsg, sizeof(COM_MESSAGE), Buffer, BufferSize, &ReplySize);
 		if (FAILED(hr)) {
 			// log to textbox
+			Globals::Instance->getTextBox()->AppendText(".....................................Failed............");
 			Globals::Instance->setCommCloseStat(TRUE);
 			break;
 		}
@@ -67,6 +68,7 @@ Return Value
 
 		TotalIrpCount += numOps;
 		Globals::Instance->addIrpHandled(numOps);
+		Globals::Instance->getTextBox()->AppendText("..........................Recieved an irp request.................");
 	}
 	delete[] Buffer;
 	return hr;
