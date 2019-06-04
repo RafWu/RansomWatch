@@ -26,14 +26,14 @@ const PWSTR ComPortName = L"\\AMFilter";
 #define MAX_FILE_NAME_SIZE (MAX_FILE_NAME_LENGTH * sizeof(WCHAR))
 #define FILE_OBJECT_ID_SIZE 16
 #define FILE_OBJEC_MAX_EXTENSION_SIZE 11
-#define MAX_IRP_OPS_PER_REQUEST 100
+#define MAX_COMM_BUFFER_SIZE 0x100000
 
 enum COM_MESSAGE_TYPE {
 	MESSAGE_ADD_SCAN_DIRECTORY,
 	MESSAGE_REM_SCAN_DIRECTORY,
 	MESSAGE_GET_OPS,
 	MESSAGE_SET_PID,
-	MESSAGE_KILL_PID // FIXME: add support
+	MESSAGE_KILL_PID // FIXME: check
 	
 
 };
@@ -47,10 +47,12 @@ typedef struct _COM_MESSAGE {
 
 enum FILE_CHANGE {
 	FILE_CHANGE_NOT_SET, 
+	FILE_OPEN_DIRECTORY,
 	FILE_CHANGE_NEW_FILE, 
 	FILE_CHANGE_RENAME_FILE, 
 	FILE_CHANGE_DELETE_FILE,
-	FILE_CHANGE_DELETE_NEW_FILE
+	FILE_CHANGE_DELETE_NEW_FILE,
+	FILE_CHANGE_OVERWRITE_FILE
 };
 
 enum IRP_MAJOR_OP { 
@@ -60,11 +62,16 @@ enum IRP_MAJOR_OP {
 	IRP_CLEANUP 
 };
 
-// -64- bytes structure, fixed to 88 bytes, hold pointer to fileName and its size, used for create and cleanup/close to handle fileName(needed for LZJD)
+// -64- bytes structure, fixed to 96 bytes, hold pointer to fileName and its size, used for create and cleanup/close to handle fileName(needed for LZJD)
 // FIXME: handle Extension in kernel and application
 typedef struct _DRIVER_MESSAGE {
 	WCHAR Extension[FILE_OBJEC_MAX_EXTENSION_SIZE + 1]; // null terminated 24 bytes
-	UCHAR FileID[FILE_OBJECT_ID_SIZE]; // 16 bytes
+#ifdef _KERNEL_MODE
+	FILE_ID_INFORMATION FileID; // 24 bytes - file id 128 bits and its volume serial number
+#else
+	FILE_ID_INFO FileID; // 24 bytes - file id 128 bits and its volume serial number
+#endif
+	
 	ULONGLONG MemSizeUsed; // for read and write, we follow buffer sizes 8 bytes
 	DOUBLE Entropy; // 8 bytes
 	ULONG PID;  // 4 bytes
@@ -108,4 +115,4 @@ typedef struct _AMF_REPLY_IRPS {
 	}
 } AMF_REPLY_IRPS, *PAMF_REPLY_IRPS;
 
-constexpr ULONG MAX_COMM_BUFFER_SIZE = sizeof(AMF_REPLY_IRPS) + MAX_IRP_OPS_PER_REQUEST * sizeof(DRIVER_MESSAGE);
+//constexpr ULONG MAX_COMM_BUFFER_SIZE = sizeof(AMF_REPLY_IRPS) + MAX_IRP_OPS_PER_REQUEST * sizeof(DRIVER_MESSAGE);

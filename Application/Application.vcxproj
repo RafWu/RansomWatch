@@ -131,6 +131,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <Reference Include="System" />
+    <Reference Include="System.Core" />
     <Reference Include="System.Data" />
     <Reference Include="System.Drawing" />
     <Reference Include="System.Windows.Forms" />
@@ -138,20 +139,21 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="FilterWorker.cpp" />
-    <ClCompile Include="HashUtility.cpp" />
     <ClCompile Include="MyForm.cpp" />
     <ClCompile Include="TrapHandler.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Common.h" />
     <ClInclude Include="FilterWorker.h" />
-    <ClInclude Include="HashUtility.h" />
     <ClInclude Include="MyForm.h">
       <FileType>CppForm</FileType>
     </ClInclude>
+    <ClInclude Include="Process.h" />
     <ClInclude Include="resource.h" />
-    <ClInclude Include="sharedContainers.h" />
+    <ClInclude Include="Globals.h" />
+    <ClInclude Include="Thresholds.h" />
     <ClInclude Include="TrapHandler.h" />
+    <ClInclude Include="Traps.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="cpp.hint" />

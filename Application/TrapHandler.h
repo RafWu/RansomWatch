@@ -4,11 +4,11 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
-#include <Windows.h>
 #include <any>
 #include <filesystem>
 #include "Common.h"
-#include "sharedContainers.h"
+#include "Traps.h"
+#include <bcrypt.h>
 #include "HashUtility.h"
 
 namespace fs = std::filesystem;
@@ -21,7 +21,7 @@ private:
 	PUCHAR Buffer;
 
 	void FillRandContent(HANDLE file, std::size_t size);
-	array<BYTE>^ getFileId(HANDLE file);
+	FileId getFileId(HANDLE file);
 	std::wstring randFileName(const std::wstring& extension, std::vector<HANDLE>& vHandles);
 	FILETIME randFileTime(const std::vector<HANDLE>& vHandles);
 	std::size_t CalcFileSize(const std::vector<HANDLE>& vHandles);

@@ -24,9 +24,6 @@
     <ClCompile Include="FilterWorker.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="HashUtility.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="MyForm.h">
@@ -44,10 +41,16 @@
     <ClInclude Include="FilterWorker.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="sharedContainers.h">
+    <ClInclude Include="Thresholds.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="HashUtility.h">
+    <ClInclude Include="Process.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Traps.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Globals.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -1,84 +1,22 @@
 #include "TrapHandler.h"
 
+#pragma comment(lib, "bcrypt.lib") 
+
 static std::unordered_map<std::wstring, std::unordered_map<std::wstring, std::wstring>> dirPFilesHash;
 static std::random_device rd;
 static std::mt19937 rng(rd());
 std::uniform_int_distribution<WORD> uniMinSec(0, 59);
 std::uniform_int_distribution<WORD> uniMilli(0, 999);
 
-// TODO: maybe change return value to enum/define
-// I use rng in the function to speed things up. it would be unneccesary
-// and wasteful to create an rng for every honeypot we want to change.
-/*static bool changeFileDate(const WORD day, const WORD month, const WORD year, const LPCWSTR& filePath, std::mt19937& rng) {
-	// create uniform distribution number generator
-
-
-	// set to desired time + randomize mins, secs and millisecs
-	FILETIME filetime;
-	SYSTEMTIME systime;
-	GetSystemTime(&systime);
-	systime.wDay = day;
-	systime.wMonth = month;
-	systime.wYear = year;
-	systime.wMinute = uniMinSec(rng);
-	systime.wMilliseconds = uniMilli(rng);
-	systime.wSecond = uniMinSec(rng);
-
-	// convert SYSTIME to FILETIME
-	if (!SystemTimeToFileTime(&systime, &filetime)) {
-		return false;
-	}
-
-	// open file and return a file handler
-	HANDLE hFile = CreateFile(filePath, // open filePath
-		GENERIC_WRITE,                    // open for writing
-		0,                                // do not share
-		nullptr,                          // no security
-		OPEN_EXISTING,                    // existing file only
-		FILE_ATTRIBUTE_NORMAL,            // normal file
-		nullptr);                         // no attr. template
-
-	  // check for failue. for example, if the file does not exist it would fail
-	if (hFile == INVALID_HANDLE_VALUE) {
-		return false;
-	}
-
-	// set to new time
-	if (!SetFileTime(hFile, &filetime, &filetime, &filetime)) {
-		return false;
-	}
-
-	CloseHandle(hFile);
-	return true;
-}*/
-
 void TrapHandler::FillRandContent(HANDLE file, std::size_t size) {
 	BCryptGenRandom(nullptr, Buffer, size, BCRYPT_USE_SYSTEM_PREFERRED_RNG);
 	Buffer[size - 1] = 0;
 	WriteFile(file, Buffer, size, nullptr, nullptr);	
-	/*std::size_t tempSize = 0;
-	static std::uniform_int_distribution<USHORT> RangeRand(1, 255);
-	UCHAR buffer[4096];
-	for (; tempSize + 4096 < size - 1; tempSize += 4096) {
-		for (DWORD i = 0; i < 4096; i++) {
-			buffer[i] = RangeRand(rng);
-		}
-		WriteFile(file, buffer, 4096, nullptr, nullptr);
-		SetFilePointer(file, 0, NULL, FILE_END);
-	}
-	DWORD it;
-	for (it = 0; it < size - tempSize - 1; it++) {
-		buffer[it] = RangeRand(rng);
-	}
-	buffer[it] = '\0';
-	WriteFile(file, buffer, it + 1, nullptr, nullptr);	*/
-
-
 }
 
-array<BYTE>^ TrapHandler::getFileId(HANDLE file) {
+FileId TrapHandler::getFileId(HANDLE file) {
 	FILE_ID_INFO idInfo;
-	array<BYTE>^ retArray = nullptr;
+	
 	// open file and return a file handler
 	// get file id info from file handle, store into idInfo which has 2 fields
 	// field 1 is volume serial number
@@ -86,18 +24,9 @@ array<BYTE>^ TrapHandler::getFileId(HANDLE file) {
 	if (!GetFileInformationByHandleEx(file, FileIdInfo, &idInfo, sizeof(idInfo))) {
 		DBOUT("GetFileId failed" << std::endl);
 	}
-	retArray = gcnew array<BYTE>(FILE_OBJECT_ID_SIZE);
-	if (retArray == nullptr) {
-		DBOUT("Alloc file id failed" << std::endl);
-	}
-	else {
+	FileId retFileId(idInfo);
 
-		const FILE_ID_128& idStruct = idInfo.FileId;
-		for (ULONG i = 0; i < FILE_OBJECT_ID_SIZE; i++) {
-			retArray[i] = idStruct.Identifier[i];
-		}
-	}
-	return retArray;
+	return retFileId;
 }
 
 // FIXME: add throws
@@ -193,7 +122,7 @@ BOOLEAN TrapHandler::TrapGenerate(const fs::path& directory) {
 	std::unordered_map<std::wstring, std::vector<std::wstring>> FilesDir;
 	WIN32_FIND_DATA data;
 	HANDLE hFind;
-	if ((hFind = FindFirstFile((directory / "*").c_str() , &data)) != INVALID_HANDLE_VALUE) {
+	if ((hFind = FindFirstFile((directory / "*").c_str(), &data)) != INVALID_HANDLE_VALUE) {
 		do {
 			fs::path file(data.cFileName);
 			std::wstring pathWstr = file.wstring();
@@ -239,7 +168,7 @@ BOOLEAN TrapHandler::TrapGenerate(const fs::path& directory) {
 			nullptr);                         // no attr. template
 
 			  // check for failue. for example, if the file does not exist it would fail
-		
+
 
 
 		if (trapHandle != INVALID_HANDLE_VALUE) {
@@ -250,7 +179,7 @@ BOOLEAN TrapHandler::TrapGenerate(const fs::path& directory) {
 			}
 
 		}
-		
+
 		for (auto handle : vHandles) {
 			CloseHandle(handle);
 		}
@@ -258,18 +187,22 @@ BOOLEAN TrapHandler::TrapGenerate(const fs::path& directory) {
 		trapsGenerated = TRUE;
 		// adding record to generated generic list of traps records
 		TrapRecord^ newRec = gcnew TrapRecord;
-		newRec->setFileId(getFileId(trapHandle));
+		FileId newId = getFileId(trapHandle);
+		newRec->setFileId(newId);
 		newRec->setFilePath(gcnew String((directory / tName).c_str()));
 		//newRec->setFileHash(gcnew String(HashFileSHA1(((directory / tName)).wstring()).c_str()));
 		newRec->setFileName(gcnew String(tName.c_str()));
 		trapsRecords->Add(newRec);
 
+		TrapsMemory::Instance->fileIdToTrapRecord[newId] = newRec;
+
 		CloseHandle(trapHandle);
 
 	}
 
-	if (trapsGenerated)
+	if (trapsGenerated) {
 		TrapsMemory::Instance->traps[systemStringDirectory] = trapsRecords;
+	}
 
 	return trapsGenerated;
 	

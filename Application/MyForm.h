@@ -1,9 +1,6 @@
 #pragma once
 
-#include <Windows.h>
-#include <FltUser.h>
 #include <comdef.h>
-#include "../SharedDefs/SharedDefs.h"
 #include <iostream>
 #include "Common.h"
 #include "TrapHandler.h"

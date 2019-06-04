@@ -1,19 +1,10 @@
 #pragma once
 
-
-#include <Windows.h>
-#include <FltUser.h>
 #include <comdef.h>
-#include "../SharedDefs/SharedDefs.h"
 #include "Common.h"
-#include "sharedContainers.h"
+#include "Process.h"
+#include "Traps.h"
 #include <msclr\marshal_cppstd.h>
-/*
-DWORD
-ScannerWorker(
-	_In_ PSCANNER_THREAD_CONTEXT Context
-);
-*/
 
 DWORD
 FilterWorker(

@@ -36,12 +36,13 @@ void CommClose();
 
 BOOLEAN IsCommClosed();
 
-NTSTATUS AMFConnect(
-	IN PFLT_PORT ClientPort,
-	IN PVOID ServerPortCookie,
-	IN PVOID ConnectionContext,
-	IN ULONG SizeOfContext,
-	OUT PVOID * ConnectionPortCookie
+NTSTATUS
+AMFConnect(
+	_In_ PFLT_PORT ClientPort,
+	_In_opt_ PVOID ServerPortCookie,
+	_In_reads_bytes_opt_(SizeOfContext) PVOID ConnectionContext,
+	_In_ ULONG SizeOfContext,
+	_Outptr_result_maybenull_ PVOID* ConnectionCookie
 );
 
 NTSTATUS AMFNewMessage(
@@ -53,10 +54,10 @@ NTSTATUS AMFNewMessage(
 	OUT PULONG ReturnOutputBufferLength
 );
 
-void AMFDissconnect(
-	IN PVOID ConnectionCookie
+VOID
+AMFDissconnect(
+	_In_opt_ PVOID ConnectionCookie
 );
-
 
 
 

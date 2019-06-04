@@ -5,7 +5,8 @@ using namespace System::Collections;
 using namespace System::Threading;
 
 #include <string>
-#include "Common.h"
+#include <windows.h>
+#include <minwinbase.h>
 
 ref class Globals {
 private:

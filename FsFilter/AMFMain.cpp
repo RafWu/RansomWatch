@@ -464,14 +464,14 @@ FSProcessPreOperartion(
 	newItem->PID = FltGetRequestorProcessId(Data);
 
 	// get file id
-	FILE_OBJECTID_INFORMATION fileInformation;
+	FILE_ID_INFORMATION fileInformation;
 	hr = FltQueryInformationFile(Data->Iopb->TargetInstance,
 		Data->Iopb->TargetFileObject,
 		&fileInformation,
-		sizeof(FILE_OBJECTID_INFORMATION),
-		FileInternalInformation,
+		sizeof(FILE_ID_INFORMATION),
+		FileIdInformation,
 		NULL);
-	RtlCopyMemory(newItem->FileID, fileInformation.ObjectId, FILE_OBJECT_ID_SIZE);
+	RtlCopyMemory(&(newItem->FileID), &fileInformation, sizeof(FILE_ID_INFORMATION));
 
 	hr = FltParseFileNameInformation(nameInfo);
 	if (!NT_SUCCESS(hr)) {
@@ -632,8 +632,6 @@ Return Value:
 
 --*/
 {
-	UNREFERENCED_PARAMETER(CompletionContext);
-	UNREFERENCED_PARAMETER(Flags);
 	FLT_POSTOP_CALLBACK_STATUS returnStatus = FLT_POSTOP_FINISHED_PROCESSING;
 
 	//
@@ -667,18 +665,18 @@ FSProcessCreateIrp(
 {
 	//FIXME: add check for connection to user
 	NTSTATUS hr;
-	if (FlagOn(Data->Iopb->OperationFlags, SL_OPEN_TARGET_DIRECTORY) || FlagOn(Data->Iopb->OperationFlags, SL_OPEN_PAGING_FILE)) {
+	if (/*FlagOn(Data->Iopb->OperationFlags, SL_OPEN_TARGET_DIRECTORY) || */FlagOn(Data->Iopb->OperationFlags, SL_OPEN_PAGING_FILE)) {
 		return FLT_POSTOP_FINISHED_PROCESSING;
 	}
 
 	BOOLEAN isDir;
-	hr = FltIsDirectory(Data->Iopb->TargetFileObject, Data->Iopb->TargetInstance, &isDir);
+	hr = FltIsDirectory(Data->Iopb->TargetFileObject, Data->Iopb->TargetInstance, &isDir); // listing possible if we remove this
 	if (!NT_SUCCESS(hr)) {
 		return FLT_POSTOP_FINISHED_PROCESSING;
 	}
-	if (isDir || driverData->isFilterClosed() /*|| IsCommClosed()*/)
+	if (driverData->isFilterClosed() /*|| IsCommClosed()*/)
 	{
-		DbgPrint("!!! FSFilter: Dir, filter closed or comm closed, return \n");
+		DbgPrint("!!! FSFilter: filter closed or comm closed, skip irp\n");
 		return FLT_POSTOP_FINISHED_PROCESSING;
 	}
 
@@ -695,14 +693,15 @@ FSProcessCreateIrp(
 	newItem->IRP_OP = IRP_CREATE;
 
 	// get file id
-	FILE_OBJECTID_INFORMATION fileInformation;
+	//FILE_OBJECTID_INFORMATION fileInformation;
+	FILE_ID_INFORMATION fileInformation;
 	hr = FltQueryInformationFile(Data->Iopb->TargetInstance,
 		Data->Iopb->TargetFileObject,
 		&fileInformation,
-		sizeof(FILE_OBJECTID_INFORMATION),
-		FileInternalInformation,
+		sizeof(FILE_ID_INFORMATION),
+		FileIdInformation,
 		NULL);
-	RtlCopyMemory(newItem->FileID, fileInformation.ObjectId, FILE_OBJECT_ID_SIZE);
+	RtlCopyMemory(&(newItem->FileID), &fileInformation, sizeof(FILE_ID_INFORMATION));
 
 	PFLT_FILE_NAME_INFORMATION nameInfo;
 	hr = FltGetFileNameInformation(Data, FLT_FILE_NAME_OPENED | FLT_FILE_NAME_QUERY_ALWAYS_ALLOW_CACHE_LOOKUP, &nameInfo);
@@ -742,20 +741,24 @@ FSProcessCreateIrp(
 	newItem->Entropy = 0;
 	newItem->isEntropyCalc = FALSE;
 
-	if ((Data->IoStatus.Information) == FILE_OVERWRITTEN) {
-		newItem->FileChange = FILE_CHANGE_DELETE_NEW_FILE;
+	if (isDir && (Data->IoStatus.Information) == FILE_OPENED) {
+		DbgPrint("!!! FSFilter: Dir listing opened on existing directory\n");
+		newItem->FileChange = FILE_OPEN_DIRECTORY;
+	} else if (isDir) {
+		DbgPrint("!!! FSFilter: Dir but not listing, not importent \n");
+		delete newEntry;
+		return FLT_POSTOP_FINISHED_PROCESSING;
+	} else if ((Data->IoStatus.Information) == FILE_OVERWRITTEN || (Data->IoStatus.Information) == FILE_SUPERSEDED) {
+		newItem->FileChange = FILE_CHANGE_OVERWRITE_FILE;
 	} else  if (FlagOn(Data->Iopb->Parameters.Create.Options, FILE_DELETE_ON_CLOSE)) {
 		newItem->FileChange = FILE_CHANGE_DELETE_FILE;
 		if ((Data->IoStatus.Information) == FILE_CREATED) {
 			newItem->FileChange = FILE_CHANGE_DELETE_NEW_FILE;
 		}
+	} else if ((Data->IoStatus.Information) == FILE_CREATED) {
+		newItem->FileChange = FILE_CHANGE_NEW_FILE;
 	}
-	else {
-		if ((Data->IoStatus.Information) == FILE_CREATED) {
-			newItem->FileChange = FILE_CHANGE_NEW_FILE;
-		}
-	}
-	DbgPrint("!!! FSFilter: Addung entry to irps\n");
+	DbgPrint("!!! FSFilter: Adding entry to irps\n");
 	driverData->AddIrpMessage(newEntry);
 	return FLT_POSTOP_FINISHED_PROCESSING;
 }
