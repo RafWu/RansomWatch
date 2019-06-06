@@ -187,7 +187,8 @@ ref struct ProcessRecord {
 		//DBOUT("Recived irp: " << Irp.IRP_OP << " process pid: " << Irp.PID);
 		System::String^ newMsg = "Recieved an irp request: ";
 		newMsg = System::String::Concat(newMsg, Irp.IRP_OP.ToString(), " From process id: ", Irp.PID.ToString(), System::Environment::NewLine);
-		Globals::Instance->getTextBox()->AppendText(newMsg);
+		Globals::Instance->postLogMessage(newMsg);
+		//Globals::Instance->getTextBox()->AppendText(newMsg);
 
 		switch (Irp.IRP_OP) 
 		{
@@ -234,7 +235,7 @@ ref struct ProcessRecord {
 
 	void UpdateSetInfo(UCHAR fileChangeEnum, const FILE_ID_INFO& idInfo) {
 		DBOUT("Update set info for irp message\n");
-		FileId newId(idInfo);
+		FileId^ newId = gcnew FileId(idInfo);
 		/*if (IsFileIdTrapFIle(idInfo)) {
 			trapsRenameDelete++;
 		}*/
@@ -243,7 +244,7 @@ ref struct ProcessRecord {
 			filesDeletedCount++;
 		}
 		else if (fileChangeEnum == FILE_CHANGE_RENAME_FILE) {
-			fileIdsRenamed->Add(newId);
+			fileIdsRenamed->Add(*newId);
 			filesRenamedCount++;
 			totalRenameOperations++;
 		}
@@ -254,21 +255,29 @@ ref struct ProcessRecord {
 	{
 		DBOUT("Update create info for irp message " << fileChangeEnum << "\n");
 		FileId newId(idInfo);
-		/*if (IsFileIdTrapFIle(idInfo)) {
+		DBOUT("File id: ");
+		for (ULONG i = 0; i < FILE_OBJECT_ID_SIZE ; i++)
+		{
+			DBOUT(newId.fileId[i] << " ");
+		}
+		DBOUT("\n");
+		/*if (IsFileIdTrapFIle(newId)) {
 			trapsOpened++;
 		}*/
 		totalCreateOperations++;
 		switch (fileChangeEnum) {
 		case FILE_CHANGE_NEW_FILE:
 		{
+			DBOUT("fileIdsCreate in\n");
 			filesCreatedCount++;
 			fileIdsCreate->Add(newId);
+			DBOUT("fileIdsCreate out\n");
 			break;
 		}
 		case FILE_CHANGE_OVERWRITE_FILE: // file is overwritten
 		{
 			filesCreatedCount++;
-			fileIdsCreate->Add(newId);
+			//fileIdsCreate->Add(*newId);
 		}
 		case FILE_CHANGE_DELETE_FILE: //file opened but will be deleted when closed
 		{
@@ -287,8 +296,10 @@ ref struct ProcessRecord {
 			break;
 		}
 		default:
-			fileIdsOpened->Add(newId);
-			filesOpenedCount++;
+			DBOUT("fileIdsOpened in \n");
+			if (fileIdsOpened->Add(newId)) filesOpenedCount++;
+			DBOUT("fileIdsOpened out, size fileIdsOpened: " << filesOpenedCount << "\n");
+			
 			break;
 		}
 		DBOUT("Exit Create info for irp\n");
@@ -298,15 +309,15 @@ ref struct ProcessRecord {
 	void UpdateWriteInfo(DOUBLE entropy, ULONGLONG writeSize, const LPCWSTR Extension, const FILE_ID_INFO& idInfo)
 	{
 		DBOUT("Update write info for irp message\n");
-		FileId newId(idInfo);
+		FileId^ newId = gcnew FileId(idInfo);
 		//BOOLEAN isTrap = IsFileIdTrapFIle(newId);
 		totalWriteBytes += writeSize;
 		
-		if (!fileIdsWrite->Contains(newId)) {
-			fileIdsWrite->Add(newId);
+		//if (!fileIdsWrite->Contains(*newId)) {
+			//fileIdsWrite->Add(*newId);
 			filesWrittenCount++;
 			//if (isTrap) trapsWrite++;
-		}
+		//}
 		// extensions
 		/*
 		if (extensionsWrite->Add(gcnew String(Extension))) {
@@ -323,15 +334,15 @@ ref struct ProcessRecord {
 	void UpdateReadInfo(DOUBLE entropy, ULONGLONG readSize, const LPCWSTR Extension, const FILE_ID_INFO& idInfo)
 	{
 		DBOUT("Update read info for irp message\n");
-		FileId newId(idInfo);
+		FileId^ newId = gcnew FileId(idInfo);
 		//BOOLEAN isTrap = IsFileIdTrapFIle(newId);
 		totalReadBytes += readSize;
 		
-		if (!fileIdsRead->Contains(newId)) {
-			fileIdsRead->Add(newId);
+		//if (!fileIdsRead->Contains(*newId)) {
+			//fileIdsRead->Add(*newId);
 			filesReadCount++;
 			//if (isTrap) trapsRead++;
-		}
+		//}
 		// extensions
 		/*
 		if (extensionsRead->Add(gcnew String(Extension))) {

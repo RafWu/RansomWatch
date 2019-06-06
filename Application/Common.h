@@ -31,7 +31,7 @@ value struct FileId {
 	ULONGLONG volumeSerialNumber;
 	array<BYTE>^ fileId;
 
-	explicit FileId(const FILE_ID_INFO& info) {
+	FileId(const FILE_ID_INFO& info) {
 		fileId = gcnew array<BYTE>(FILE_OBJECT_ID_SIZE);
 		const FILE_ID_128& idStruct = info.FileId;
 		for (ULONG i = 0; i < FILE_OBJECT_ID_SIZE; i++) {
@@ -43,13 +43,13 @@ value struct FileId {
 
 	virtual bool Equals(Object^ obj) override {
 		
-		if (obj == nullptr || obj->GetType() != FileId::typeid) return false;
+		if (obj->GetType() != FileId::typeid) return false;
 		return Equals(safe_cast<FileId^>(obj));
 
 	}
 
 	virtual bool Equals(FileId^ other) {
-		if (other == nullptr || other->fileId == nullptr) return false;
+		if (other->fileId == nullptr) return false;
 		if (other->volumeSerialNumber == volumeSerialNumber) {
 			for (ULONG i = 0; i < FILE_OBJECT_ID_SIZE; i++) {
 				if (fileId[i] != other->fileId[i]) {
@@ -67,14 +67,14 @@ value struct FileId {
 		//interior_ptr<ULONG> ptr = &volumeSerialNumber;
 		ULONG val1 = volumeSerialNumber;
 		ULONG val2 = (volumeSerialNumber >> (sizeof(ULONG) * 8));
-		ULONG val3 = (((ULONG)fileId[0]) | (((ULONG)fileId[1]) << 8) | (((ULONG)fileId[2]) << 16) | (((ULONG)fileId[3]) << 24));
-		ULONG val4 = (((ULONG)fileId[4]) | (((ULONG)fileId[5]) << 8) | (((ULONG)fileId[6]) << 16) | (((ULONG)fileId[7]) << 24));
-		ULONG val5 = (((ULONG)fileId[8]) | (((ULONG)fileId[9]) << 8) | (((ULONG)fileId[10]) << 16) | (((ULONG)fileId[11]) << 24));
-		ULONG val6 = (((ULONG)fileId[12]) | (((ULONG)fileId[13]) << 8) | (((ULONG)fileId[14]) << 16) | (((ULONG)fileId[15]) << 24));
-
+		ULONG val3 = (((ULONG)(fileId[0])) | (((ULONG)(fileId[1])) << 8) | (((ULONG)(fileId[2])) << 16) | (((ULONG)(fileId[3])) << 24));
+		ULONG val4 = (((ULONG)(fileId[4])) | (((ULONG)(fileId[5])) << 8) | (((ULONG)(fileId[6])) << 16) | (((ULONG)(fileId[7])) << 24));
+		ULONG val5 = (((ULONG)(fileId[8])) | (((ULONG)(fileId[9])) << 8) | (((ULONG)(fileId[10])) << 16) | (((ULONG)(fileId[11])) << 24));
+		ULONG val6 = (((ULONG)(fileId[12])) | (((ULONG)(fileId[13])) << 8) | (((ULONG)(fileId[14])) << 16) | (((ULONG)(fileId[15])) << 24));
+		
 		ULONG xor_values = val1 ^ val2 ^ val3 ^ val4 ^ val5 ^ val6;
 		return ((int)xor_values);
-		
+
 	}
 
 	static bool operator!= (FileId^ obj1, FileId^ obj2) {
@@ -82,7 +82,7 @@ value struct FileId {
 	}
 
 	static bool operator== (FileId^ obj1, FileId^ obj2) {
-		if (obj1 == nullptr || obj1->fileId == nullptr || obj2 == nullptr || obj2->fileId == nullptr) return false;
+		if (obj1->fileId == nullptr || obj2->fileId == nullptr) return false;
 		if (obj1->volumeSerialNumber == obj2->volumeSerialNumber) {
 			for (ULONG i = 0; i < FILE_OBJECT_ID_SIZE; i++) {
 				if (obj1->fileId[i] != obj2->fileId[i]) {
@@ -96,6 +96,42 @@ value struct FileId {
 		return false;
 	}
 
+	static bool operator< (FileId^ obj1, FileId^ obj2) {
+		if (obj1->fileId == nullptr || obj2->fileId == nullptr) return false;
+		if (obj1->volumeSerialNumber < obj2->volumeSerialNumber) {
+			return true;
+		} 
+		else if (obj1->volumeSerialNumber == obj2->volumeSerialNumber) {
+			for (ULONG i = 0; i < FILE_OBJECT_ID_SIZE; i++) {
+				if (obj1->fileId[i] < obj2->fileId[i]) {
+					return true;
+				}
+			}
+			return false;
+
+		}
+
+		return false;
+	}
+
+	static bool operator<= (FileId^ obj1, FileId^ obj2) {
+		if (obj1->fileId == nullptr || obj2->fileId == nullptr) return false;
+		if (obj1->volumeSerialNumber > obj2->volumeSerialNumber) {
+			return false;
+		}
+		else if (obj1->volumeSerialNumber == obj2->volumeSerialNumber) {
+			for (ULONG i = 0; i < FILE_OBJECT_ID_SIZE; i++) {
+				if (obj1->fileId[i] > obj2->fileId[i]) {
+					return false;
+				}
+			}
+			return true;
+
+		}
+
+		return true;
+	}
+
 	FILE_ID_INFO ConvertFormatWindows() {
 		FILE_ID_INFO newItem;
 		newItem.VolumeSerialNumber = volumeSerialNumber;
@@ -105,9 +141,4 @@ value struct FileId {
 		return newItem;
 	}
 
-
-	/*
-	 bool Equals (FileId id) {
-
-	}*/
 };

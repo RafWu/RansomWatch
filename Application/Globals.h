@@ -29,6 +29,14 @@ public:
 	System::Windows::Forms::TextBox^ getTextBox() {
 		return logView;
 	}
+	
+	/*FIXME: Might not work well*/
+	void postLogMessage(String^ message)
+	{
+		Monitor::Enter(logView);
+		logView->AppendText(message);
+		Monitor::Exit(logView);
+	}
 
 	ULONGLONG addIrpHandled(ULONGLONG num) {
 		ULONGLONG ret;
@@ -110,3 +118,5 @@ private:
 	static FilterDirectories^ m_Instance = gcnew FilterDirectories;
 
 };
+
+public delegate void msgDelegate(String^ msg);

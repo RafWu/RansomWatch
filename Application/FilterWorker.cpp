@@ -39,7 +39,8 @@ Return Value
 		hr = FilterSendMessage(Port, &GetIrpMsg, sizeof(COM_MESSAGE), Buffer, BufferSize, &ReplySize);
 		if (FAILED(hr)) {
 			// log to textbox
-			Globals::Instance->getTextBox()->AppendText("...........Failed............");
+			//FIXME: Globals::Instance->getTextBox()->AppendText("...........Failed............");
+
 			Globals::Instance->setCommCloseStat(TRUE);
 			break;
 		}
@@ -69,7 +70,9 @@ Return Value
 		TotalIrpCount += numOps;
 		Globals::Instance->addIrpHandled(numOps);
 
-		Globals::Instance->getTextBox()->AppendText("........Recieved an irp request.........\r\n");
+		//Globals::Instance->getTextBox()->AppendText("........Recieved an irp request.........\r\n");
+		//Globals::Instance->getTextBox()->Invoke(gcnew Action<String^> (Globals::Instance->getTextBox()), gcnew array<Object^> { "........Recieved an irp request.........\r\n" }) ;
+		Globals::Instance->postLogMessage("........Recieved an irp request.........\r\n");
 	}
 	delete[] Buffer;
 	return hr;

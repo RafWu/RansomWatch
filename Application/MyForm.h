@@ -141,7 +141,7 @@ namespace AntiRansomWareApp {
 			this->logViewer->ReadOnly = true;
 			this->logViewer->Size = System::Drawing::Size(521, 252);
 			this->logViewer->TabIndex = 10;
-			this->logViewer->Visible = false;
+			this->logViewer->Visible = true;
 			// 
 			// AutoKill
 			// 
