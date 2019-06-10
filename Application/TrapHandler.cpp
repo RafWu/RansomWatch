@@ -2,7 +2,6 @@
 
 #pragma comment(lib, "bcrypt.lib") 
 
-static std::unordered_map<std::wstring, std::unordered_map<std::wstring, std::wstring>> dirPFilesHash;
 static std::random_device rd;
 static std::mt19937 rng(rd());
 std::uniform_int_distribution<WORD> uniMinSec(0, 59);
@@ -55,7 +54,6 @@ FILETIME TrapHandler::randFileTime(const std::vector<HANDLE>& vHandles ) {
 		if (fHandle == INVALID_HANDLE_VALUE) {
 			continue;
 		}
-		LONGLONG res;
 		if (GetFileTime(fHandle, &time, nullptr, nullptr)) {
 			times.push_back(time);
 		}
@@ -115,8 +113,9 @@ std::size_t TrapHandler::CalcFileSize(const std::vector<HANDLE>& vHandles) {
 
 }
 
-BOOLEAN TrapHandler::TrapGenerate(const fs::path& directory) {
+BOOLEAN TrapHandler::TrapGenerate(const fs::directory_entry& DirPath) {
 	BOOLEAN trapsGenerated = FALSE;
+	fs::path directory = DirPath.path();
 	String^ systemStringDirectory = gcnew String(directory.c_str());
 	Generic::List<TrapRecord^>^ trapsRecords = gcnew Generic::List<TrapRecord^>;
 	std::unordered_map<std::wstring, std::vector<std::wstring>> FilesDir;
@@ -190,7 +189,6 @@ BOOLEAN TrapHandler::TrapGenerate(const fs::path& directory) {
 		FileId newId = getFileId(trapHandle);
 		newRec->setFileId(newId);
 		newRec->setFilePath(gcnew String((directory / tName).c_str()));
-		//newRec->setFileHash(gcnew String(HashFileSHA1(((directory / tName)).wstring()).c_str()));
 		newRec->setFileName(gcnew String(tName.c_str()));
 		trapsRecords->Add(newRec);
 
@@ -208,96 +206,51 @@ BOOLEAN TrapHandler::TrapGenerate(const fs::path& directory) {
 	
 }
 
-/*
-// TODO: we may need to change to wstring to handle files, currently we limit trap files to english only in name and path
-// TODO: when debugging and testing the change date we need to check for illegal dates, negative numbers, etc..
-static std::unordered_map<std::wstring, std::wstring> genDirTraps(const fs::path& directory) {
-	std::unordered_map<std::wstring, std::wstring> newMap; //retMap
-	std::wstring modulesPath = L"my modules";
-	std::wstring trapModule = L"RandomFileGenerator";
-	BOOLEAN trapsGenerated = FALSE;
-	String^ systemStringDirectory = gcnew String(directory.c_str());
-	Generic::List<TrapRecord^>^ trapsRecords;
-
-
-	DBOUT("current directory: " << fs::current_path().c_str() << std::endl);
-
-	CPPython myScripts;
-
-	DBOUT("Loading module path: " << modulesPath << std::endl);
-	// adding my modules directory (can add more than one)
-	myScripts.addModulePath({ modulesPath.c_str() });
-
-	DBOUT("Loading module: " << trapModule << std::endl);
-	// loading a module (can add more than one)
-	myScripts.loadModule({ trapModule.c_str() });
-
-	DBOUT("Running trap generation using python" << std::endl);
-	// calliing a function called "main" in module "RandomFileGenerator" with folder argument.
-	// format string for calling functions are according to:
-	// http://dbpubs.stanford.edu:8091/~testbed/python/manual.1.4/ext/node11.html
-	// in this example the format string is "u", which means there is only one argument
-	// (L"C:\\Users\\Aviad\\Downloads") and it is of type u(nicode) = wchar_t*
-	auto ret1 = myScripts.callFunction(L"RandomFileGenerator", L"main", "u", directory.c_str()); //gen traps with Python
-
-	if (CPPython::any_cast<std::vector<CPPython::any>>(ret1).size()) {
-		trapsGenerated = TRUE;
-		trapsRecords = gcnew Generic::List<TrapRecord^>;
-	}
-
-	for (auto& r : CPPython::any_cast<std::vector<CPPython::any>>(ret1)) {
-		std::wstring file = CPPython::any_cast<std::wstring>(r).c_str();
-		DBOUT("Generated trap file: " << file << std::endl);
-		newMap[file] =  HashFileSHA1(((directory / file)).wstring());
-		if (!changeFileDate(1, 1, 2000, (directory / file).c_str(), rng)) {
-			DBOUT("Failed to change file date: " << file << std::endl);
-		}
-		DBOUT("Hashed file: " << file << " from directory: "  << directory.c_str() << std::endl);
-
-		// adding record to generated generic list of traps records
-		TrapRecord^ newRec = gcnew TrapRecord;
-		newRec->setFileId(getFileId(file));
-		newRec->setFilePath(gcnew String((directory / file).c_str()));
-		newRec->setFileHash(gcnew String(HashFileSHA1(((directory / file)).wstring()).c_str()));
-		newRec->setFileName(gcnew String(file.c_str()));
-		trapsRecords->Add(newRec);
-		
-	}
-
-	if (trapsGenerated)
-		TrapsMemory::Instance->traps[systemStringDirectory] = trapsRecords;
-
-	return newMap;
-}*/
-
-/**/
-
-std::wstring TrapHandler::getFileHash(const std::wstring &filePath) {
-	fs::path file = filePath;
-	if (!fs::exists(file) || !fs::is_regular_file(file)) throw "filepath is not a path to valid file"; // TODO: throw and catch
-	file = fs::absolute(file);
-	std::wstring fileName = file.filename();
-	std::wstring dirPath = file.remove_filename();
-	if (!dirPFilesHash.count(dirPath) || !dirPFilesHash.at(dirPath).count(fileName)) {
-		throw "trap file not found";
-	}
-	return dirPFilesHash.at(dirPath).at(fileName);
-}
-
-BOOLEAN TrapHandler::isFileTrap(const std::wstring& filePath) {
-	fs::path file = filePath;
-	if (!fs::exists(file) || !fs::is_regular_file(file)) throw "filepath is not a path to valid file"; // TODO: throw and catch
-	file = fs::absolute(file);
-	std::wstring fileName = file.filename();
-	std::wstring dirPath = file.remove_filename();
-	return (dirPFilesHash.count(dirPath) && dirPFilesHash.at(dirPath).count(fileName));
-}
-
-int TrapHandler::initTraps(const std::vector<std::wstring> &dirs) {
+int TrapHandler::initDirTraps(System::String ^ Path) {
+	pin_ptr<const wchar_t> wch = PtrToStringChars(Path);
+	std::wstring directoryStr(wch);
+	fs::path Directory(directoryStr);
+	ULONGLONG dirFiles = 0;
+	ULONGLONG dirSubDirs = 0;
 	int ret = EXIT_SUCCESS;
-	for (const std::wstring& dir : dirs) {
-		if (addDir(dir) == EXIT_FAILURE) // catch throw on gen failure, vector may be empty
+	for (auto& pDir : fs::recursive_directory_iterator(Directory)) { //iterate recursively all sub dirs
+		if (pDir.is_directory() && addDir(pDir) == EXIT_FAILURE) {
 			ret = EXIT_FAILURE;
+		}
+		if (pDir.is_directory()) {
+			dirSubDirs++;
+		}
+		else {
+			dirFiles++;
+		}
+		
+		//DBOUT("Found file/dir: " << pDir << std::endl);
+	}
+	if (fs::is_directory(Directory) && addDir(fs::directory_entry(Directory)) == EXIT_FAILURE) {
+		ret = EXIT_FAILURE;
+	}
+	Globals::Instance->addNumOfDirsProtected(dirSubDirs);
+	Globals::Instance->addNumOfFilesProtected(dirFiles);
+	return ret;
+}
+
+int TrapHandler::remDirTraps(System::String^ Path) {
+	int ret = EXIT_SUCCESS;
+	pin_ptr<const wchar_t> wch = PtrToStringChars(Path);
+	std::wstring directoryStr(wch);
+	fs::path Directory(directoryStr);
+	if (TrapsMemory::Instance->traps->ContainsKey(Path)) {
+		for (auto& pDir : fs::recursive_directory_iterator(Directory)) { //iterate recursively
+			if (pDir.is_directory() && remDir(pDir) == EXIT_FAILURE) {
+				ret = EXIT_FAILURE;
+			}
+		}
+		if (fs::is_directory(Directory) && remDir(fs::directory_entry(Directory)) == EXIT_FAILURE) {
+			ret = EXIT_FAILURE;
+		}
+	}
+	else {
+		return EXIT_FAILURE;
 	}
 	return ret;
 }
@@ -305,36 +258,27 @@ int TrapHandler::initTraps(const std::vector<std::wstring> &dirs) {
 int TrapHandler::cleanTraps() {
 	int ret = EXIT_SUCCESS;
 	DBOUT("Cleaning all trap files" << std::endl);
-	for (const auto & PairdirFilesMap : dirPFilesHash)
+	for each (String^ RootPath in TrapsMemory::Instance->traps->Keys)
 	{
-		fs::path directory = PairdirFilesMap.first;
-		const std::unordered_map<std::wstring, std::wstring>& files = PairdirFilesMap.second;
-		DBOUT("Clean directory: " << directory.c_str() << std::endl);
-		for (const auto & file : files) {
-			fs::path filePath = directory / file.first;
-			DBOUT("Removing file: " << filePath.c_str() <<  std::endl);
-			if (!fs::remove(filePath)) {
-				DBOUT("Failed to remove file: " << filePath.c_str() << std::endl);
-				ret = EXIT_FAILURE; // FIXME: throw
-			}
-		}
+		pin_ptr<const wchar_t> wch = PtrToStringChars(RootPath);
+		std::wstring rootDirectoryStr(wch);
+		DBOUT("Clean directory: " << rootDirectoryStr << std::endl);
+		if (!remDirTraps(RootPath))  ret = EXIT_FAILURE;
 	}
 	return ret;
 }
 
-int TrapHandler::addDir(const std::wstring& dirPath) {
+int TrapHandler::addDir(const fs::directory_entry& dirPath) {
 	DBOUT("Adding directory to traps handling " << dirPath << std::endl);
-	fs::path directory = dirPath;
-	if (fs::exists(directory) && fs::is_directory(directory)) { // TODO: throw and catch
+	System::String^ PathSystem = gcnew System::String(dirPath.path().c_str());
+	if (dirPath.exists()) { // TODO: throw and catch
 		DBOUT("Directory exist, checking if traps already exist" << std::endl);
-		fs::path absDirectory = fs::absolute(directory);
-		DBOUT("Absolute path: " << absDirectory.c_str() << std::endl);
-		if (dirPFilesHash.count(absDirectory.c_str()) == 0) {
-			TrapGenerate(absDirectory.c_str());
+		if (!TrapsMemory::Instance->traps->ContainsKey(PathSystem)) {
+			TrapGenerate(dirPath);
 			return EXIT_SUCCESS;
 		}
 		else {
-			DBOUT("Directory already have traps: " << absDirectory.c_str() << std::endl);
+			DBOUT("Directory already have traps: " << dirPath << std::endl);
 		}
 	}
 	else {
@@ -344,28 +288,42 @@ int TrapHandler::addDir(const std::wstring& dirPath) {
 	return EXIT_FAILURE;
 }
 
-int TrapHandler::remDir(const std::wstring &dirPath) {
+int TrapHandler::remDir(const fs::directory_entry& dirPath) {
 	int retVal = EXIT_SUCCESS;
+	System::String^ Path = gcnew String(dirPath.path().c_str());
 	DBOUT("Removing directory from traps handling" << dirPath << std::endl);
 	fs::path directory = dirPath;
-	if (!fs::exists(directory) || !fs::is_directory(directory)) {
+	if (!dirPath.exists()) {
 		throw "Not a valid directory"; // TODO: throw and catch
 	}
-	directory = fs::absolute(directory);
+	Generic::List<TrapRecord^>^ trapRecords = nullptr;
+	if (TrapsMemory::Instance->traps->TryGetValue(Path, trapRecords) && trapRecords != nullptr) {
+		if (trapRecords != nullptr) {
+			
+			for each (TrapRecord ^ record in trapRecords) {
+				
+				System::String^ filePath = record->getFilePath();
+				pin_ptr<const wchar_t> wch = PtrToStringChars(filePath);
+				std::wstring filePathStr(wch);
+				DBOUT("Removing file: " << filePathStr << std::endl);
+				
+				FileId id = record->getFileId();
+				TrapRecord^ tmp;
+				TrapsMemory::Instance->fileIdToTrapRecord->TryRemove(id, tmp); //unlink
 
-	if (dirPFilesHash.count(directory.c_str())) { // found the directory in traps database
-		const std::unordered_map<std::wstring, std::wstring>& files = dirPFilesHash.at(directory.c_str());
-		for (const auto & file : files) {
-			fs::path filePath = (directory / file.first);
-			DBOUT("Removing file: " << filePath.c_str() << std::endl);
-			if (!fs::remove(filePath)) {
-				DBOUT("Failed to remove file: " << filePath.c_str() << std::endl);
-				retVal = EXIT_FAILURE; // FIXME: throw
+				fs::path fileFsPath(filePathStr);
+				if (!fs::remove(fileFsPath)) {
+					DBOUT("Failed to remove file: " << filePathStr << std::endl);
+					retVal = EXIT_FAILURE; // FIXME: throw
+				}
+				
 			}
 		}
-		dirPFilesHash.erase(directory.c_str());
+		TrapsMemory::Instance->traps->TryRemove(Path, trapRecords);
+
 	}
 	else {
+		DBOUT("No directory to remove: " << dirPath << std::endl);
 		retVal = EXIT_FAILURE;
 	}
 	return retVal;

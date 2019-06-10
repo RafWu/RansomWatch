@@ -7,6 +7,7 @@ using namespace System;
 
 #include <Psapi.h>
 #include "Traps.h"
+#include "Thresholds.h"
 
 ref struct ProcessRecord {
 	ULONG pid;
@@ -220,6 +221,8 @@ ref struct ProcessRecord {
 			default:
 			{
 				DBOUT("Recived unhandled irp message: " << Irp.IRP_OP << " process pid: " << Irp.PID);
+				Monitor::Exit(this);
+				return FALSE;
 			}
 
 		}
@@ -235,16 +238,16 @@ ref struct ProcessRecord {
 
 	void UpdateSetInfo(UCHAR fileChangeEnum, const FILE_ID_INFO& idInfo) {
 		DBOUT("Update set info for irp message\n");
-		FileId^ newId = gcnew FileId(idInfo);
-		/*if (IsFileIdTrapFIle(idInfo)) {
+		FileId newId(idInfo);
+		if (IsFileIdTrapFIle(newId)) {
 			trapsRenameDelete++;
-		}*/
+		}
 
 		if (fileChangeEnum == FILE_CHANGE_DELETE_FILE) {
 			filesDeletedCount++;
 		}
 		else if (fileChangeEnum == FILE_CHANGE_RENAME_FILE) {
-			fileIdsRenamed->Add(*newId);
+			fileIdsRenamed->Add(newId);
 			filesRenamedCount++;
 			totalRenameOperations++;
 		}
@@ -261,9 +264,9 @@ ref struct ProcessRecord {
 			DBOUT(newId.fileId[i] << " ");
 		}
 		DBOUT("\n");
-		/*if (IsFileIdTrapFIle(newId)) {
+		if (IsFileIdTrapFIle(newId)) {
 			trapsOpened++;
-		}*/
+		}
 		totalCreateOperations++;
 		switch (fileChangeEnum) {
 		case FILE_CHANGE_NEW_FILE:
@@ -277,12 +280,12 @@ ref struct ProcessRecord {
 		case FILE_CHANGE_OVERWRITE_FILE: // file is overwritten
 		{
 			filesCreatedCount++;
-			//fileIdsCreate->Add(*newId);
+			fileIdsCreate->Add(newId);
 		}
 		case FILE_CHANGE_DELETE_FILE: //file opened but will be deleted when closed
 		{
 			filesDeletedCount++;
-			/*if (IsFileIdTrapFIle(idInfo)) trapsRenameDelete++;*/
+			if (IsFileIdTrapFIle(newId)) trapsRenameDelete++;
 			break;
 		}
 
@@ -309,20 +312,20 @@ ref struct ProcessRecord {
 	void UpdateWriteInfo(DOUBLE entropy, ULONGLONG writeSize, const LPCWSTR Extension, const FILE_ID_INFO& idInfo)
 	{
 		DBOUT("Update write info for irp message\n");
-		FileId^ newId = gcnew FileId(idInfo);
-		//BOOLEAN isTrap = IsFileIdTrapFIle(newId);
+		FileId newId(idInfo);
+		BOOLEAN isTrap = IsFileIdTrapFIle(newId);
 		totalWriteBytes += writeSize;
 		
-		//if (!fileIdsWrite->Contains(*newId)) {
-			//fileIdsWrite->Add(*newId);
+		if (!fileIdsWrite->Contains(newId)) {
+			fileIdsWrite->Add(newId);
 			filesWrittenCount++;
-			//if (isTrap) trapsWrite++;
-		//}
+			if (isTrap) trapsWrite++;
+		}
 		// extensions
-		/*
+		
 		if (extensionsWrite->Add(gcnew String(Extension))) {
 			fileExtensionTypesWrite++;
-		}*/
+		}
 
 		//handle entropy
 		// FIXME: need to account for sizes in bytes
@@ -334,25 +337,32 @@ ref struct ProcessRecord {
 	void UpdateReadInfo(DOUBLE entropy, ULONGLONG readSize, const LPCWSTR Extension, const FILE_ID_INFO& idInfo)
 	{
 		DBOUT("Update read info for irp message\n");
-		FileId^ newId = gcnew FileId(idInfo);
-		//BOOLEAN isTrap = IsFileIdTrapFIle(newId);
+		FileId newId(idInfo);
+		BOOLEAN isTrap = IsFileIdTrapFIle(newId);
 		totalReadBytes += readSize;
 		
-		//if (!fileIdsRead->Contains(*newId)) {
-			//fileIdsRead->Add(*newId);
+		if (!fileIdsRead->Contains(newId)) {
+			fileIdsRead->Add(newId);
 			filesReadCount++;
-			//if (isTrap) trapsRead++;
-		//}
+			if (isTrap) trapsRead++;
+		}
 		// extensions
-		/*
+		
 		if (extensionsRead->Add(gcnew String(Extension))) {
 			fileExtensionTypesRead++;
-		}*/
+		}
 
 		//handle entropy
+		// FIXME: account for bytes sizes
 		averegeReadEntropy = ((averegeReadEntropy * totalReadOperations + entropy) / (totalReadOperations + 1));
 
 		totalReadOperations++;
+	}
+
+	BOOLEAN isProcessMalicious() {
+		
+
+		return FALSE;
 	}
 
 };

@@ -32,8 +32,10 @@ Return Value
 	GetIrpMsg.type = MESSAGE_GET_OPS;
 	GetIrpMsg.pid = GetCurrentProcessId();
 	GetIrpMsg.path[0] = L'\0';
+	
 
 	while (!Globals::Instance->getCommCloseStat()) { // while communication open
+		std::set<ULONG> pidsCheck;
 		DWORD ReplySize;
 		ULONGLONG numOps = 0;
 		hr = FilterSendMessage(Port, &GetIrpMsg, sizeof(COM_MESSAGE), Buffer, BufferSize, &ReplySize);
@@ -63,6 +65,7 @@ Return Value
 				// log
 				break;
 			}
+			pidsCheck.insert(MsgsBuffer[i].PID);
 		}
 
 		// log 
@@ -70,9 +73,12 @@ Return Value
 		TotalIrpCount += numOps;
 		Globals::Instance->addIrpHandled(numOps);
 
-		//Globals::Instance->getTextBox()->AppendText("........Recieved an irp request.........\r\n");
-		//Globals::Instance->getTextBox()->Invoke(gcnew Action<String^> (Globals::Instance->getTextBox()), gcnew array<Object^> { "........Recieved an irp request.........\r\n" }) ;
-		Globals::Instance->postLogMessage("........Recieved an irp request.........\r\n");
+		// check Malicious, handle in that case
+		for (ULONG pid : pidsCheck) {
+			CheckHandleMaliciousApplication(pid);
+		}
+
+		Globals::Instance->postLogMessage("... Finished handling irp requests, requesting\r\n");
 	}
 	delete[] Buffer;
 	return hr;
@@ -82,7 +88,7 @@ HRESULT ProcessIrp(CONST DRIVER_MESSAGE& msg) {
 	ULONG IrpPid = msg.PID;
 	ProcessRecord^ record;
 	if (ProcessesMemory::Instance->Processes->TryGetValue(IrpPid, record)) { // val found
-		if (record == nullptr) {
+		if (record == nullptr) { // found pid but no process record/ shouldnt happen
 			return S_FALSE;
 		}
 		record->AddIrpRecord(msg);
@@ -94,7 +100,7 @@ HRESULT ProcessIrp(CONST DRIVER_MESSAGE& msg) {
 			record->AddIrpRecord(msg);
 			return S_OK;
 		}
-		else { // cant add but cant get eitherwe fail here
+		else { // cant add but cant get either we fail here
 			if (record == nullptr) {
 				// log
 				return S_FALSE;
@@ -108,6 +114,32 @@ HRESULT ProcessIrp(CONST DRIVER_MESSAGE& msg) {
 	return S_OK;
 }
 
-BOOLEAN IsMaliciousApplication(ULONG PID) {
-	return TRUE;
+VOID HandleMaliciousApplication(ProcessRecord^ record) {
+	if (record != nullptr) {
+		ULONG pid = record->pid;
+		std::wstring name = std::to_wstring(pid);
+		// FIXME: LOG + print
+		Globals::Instance->postLogMessage("Handling malicious application\r\n");
+		if (Globals::Instance->getKillStat()) {
+			Globals::Instance->postLogMessage("Attempt to kill process using application\r\n");
+			MessageBox(NULL, L"Malicious Application", L"Not emplemented yet, attempt kill locally then with driver", MB_OK);
+
+		}
+		else {
+			Globals::Instance->postLogMessage("Auto kill disabled reporting the pid\r\n");
+			MessageBox(NULL, L"Malicious Application", name.c_str(), MB_OK);
+		}
+		
+	}
+}
+
+VOID CheckHandleMaliciousApplication(ULONG pid) {
+	ProcessRecord^ record;
+	if (ProcessesMemory::Instance->Processes->TryGetValue(pid, record)) {
+		if (record->isProcessMalicious()) {
+			// FIXME: LOG + print
+			Globals::Instance->postLogMessage("Found malicious application\r\n");
+			HandleMaliciousApplication(record);
+		}
+	}
 }

@@ -65,8 +65,8 @@ value struct FileId {
 
 	virtual int GetHashCode() override {
 		//interior_ptr<ULONG> ptr = &volumeSerialNumber;
-		ULONG val1 = volumeSerialNumber;
-		ULONG val2 = (volumeSerialNumber >> (sizeof(ULONG) * 8));
+		ULONG val1 = static_cast<ULONG> (volumeSerialNumber);
+		ULONG val2 = static_cast<ULONG>((volumeSerialNumber >> (sizeof(ULONG) * 8)));
 		ULONG val3 = (((ULONG)(fileId[0])) | (((ULONG)(fileId[1])) << 8) | (((ULONG)(fileId[2])) << 16) | (((ULONG)(fileId[3])) << 24));
 		ULONG val4 = (((ULONG)(fileId[4])) | (((ULONG)(fileId[5])) << 8) | (((ULONG)(fileId[6])) << 16) | (((ULONG)(fileId[7])) << 24));
 		ULONG val5 = (((ULONG)(fileId[8])) | (((ULONG)(fileId[9])) << 8) | (((ULONG)(fileId[10])) << 16) | (((ULONG)(fileId[11])) << 24));

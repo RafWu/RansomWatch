@@ -14,6 +14,8 @@ private:
 	BOOLEAN isisMonitorStopped = FALSE;
 	BOOLEAN isCommClosed = TRUE;
 	ULONGLONG TotalIrpsHandled = 0;
+	ULONGLONG numOfFilesProtected = 0;
+	ULONGLONG numOfDirsProtected = 0;
 public: System::Windows::Forms::TextBox^ logView;
 
 public:
@@ -36,6 +38,52 @@ public:
 		Monitor::Enter(logView);
 		logView->AppendText(message);
 		Monitor::Exit(logView);
+	}
+
+	ULONGLONG addNumOfFilesProtected(ULONGLONG Val) {
+		ULONGLONG ret;
+		Monitor::Enter(this);
+		numOfFilesProtected += Val;
+		ret = numOfFilesProtected;
+		Monitor::Exit(this);
+		return ret;
+	}
+
+	ULONGLONG redNumOfFilesProtected(ULONGLONG Val) {
+		ULONGLONG ret;
+		Monitor::Enter(this);
+		if (numOfFilesProtected >= Val) {
+			numOfFilesProtected -= Val;
+		}
+		else {
+			numOfFilesProtected = 0;
+		}
+		ret = numOfFilesProtected;
+		Monitor::Exit(this);
+		return ret;
+	}
+
+	ULONGLONG addNumOfDirsProtected(ULONGLONG Val) {
+		ULONGLONG ret;
+		Monitor::Enter(this);
+		numOfDirsProtected += Val;
+		ret = numOfDirsProtected;
+		Monitor::Exit(this);
+		return ret;
+	}
+
+	ULONGLONG redNumOfDirsProtected(ULONGLONG Val) {
+		ULONGLONG ret;
+		Monitor::Enter(this);
+		if (numOfDirsProtected >= Val) {
+			numOfDirsProtected -= Val;
+		}
+		else {
+			numOfDirsProtected = 0;
+		}
+		ret = numOfDirsProtected;
+		Monitor::Exit(this);
+		return ret;
 	}
 
 	ULONGLONG addIrpHandled(ULONGLONG num) {

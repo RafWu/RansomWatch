@@ -37,7 +37,7 @@ namespace AntiRansomWareApp {
 	private: System::Windows::Forms::CheckBox^  DisableProtection;
 	private: System::Windows::Forms::Button^  SelectAddRootDir;
 	private: System::Windows::Forms::Button^  SelectRemRootDir;
-	private: System::Windows::Forms::Button^  InitTraps;
+
 	private: System::Windows::Forms::TextBox^  logViewer;
 
 	//public: HANDLE port;
@@ -104,7 +104,6 @@ namespace AntiRansomWareApp {
 		void InitializeComponent(void)
 		{
 			this->Exit = (gcnew System::Windows::Forms::Button());
-			this->InitTraps = (gcnew System::Windows::Forms::Button());
 			this->logViewer = (gcnew System::Windows::Forms::TextBox());
 			this->AutoKill = (gcnew System::Windows::Forms::CheckBox());
 			this->ViewLog = (gcnew System::Windows::Forms::CheckBox());
@@ -123,22 +122,13 @@ namespace AntiRansomWareApp {
 			this->Exit->UseVisualStyleBackColor = true;
 			this->Exit->Click += gcnew System::EventHandler(this, &MyForm::button1_Click);
 			// 
-			// InitTraps
-			// 
-			this->InitTraps->Location = System::Drawing::Point(26, 59);
-			this->InitTraps->Name = L"InitTraps";
-			this->InitTraps->Size = System::Drawing::Size(52, 23);
-			this->InitTraps->TabIndex = 9;
-			this->InitTraps->Text = L"Init &Traps";
-			this->InitTraps->UseVisualStyleBackColor = true;
-			this->InitTraps->Click += gcnew System::EventHandler(this, &MyForm::Init_traps);
-			// 
 			// logViewer
 			// 
 			this->logViewer->Location = System::Drawing::Point(12, 116);
 			this->logViewer->Multiline = true;
 			this->logViewer->Name = L"logViewer";
 			this->logViewer->ReadOnly = true;
+			this->logViewer->ScrollBars = System::Windows::Forms::ScrollBars::Vertical;
 			this->logViewer->Size = System::Drawing::Size(521, 252);
 			this->logViewer->TabIndex = 10;
 			this->logViewer->Visible = true;
@@ -214,7 +204,6 @@ namespace AntiRansomWareApp {
 			this->Controls->Add(this->ViewLog);
 			this->Controls->Add(this->AutoKill);
 			this->Controls->Add(this->logViewer);
-			this->Controls->Add(this->InitTraps);
 			this->Controls->Add(this->Exit);
 			this->FormBorderStyle = System::Windows::Forms::FormBorderStyle::None;
 			this->Name = L"MyForm";
@@ -272,18 +261,6 @@ private: System::Void viewlog_changed(System::Object^  sender, System::EventArgs
 	}
 }
 
-
-private: System::Void Init_traps(System::Object^  sender, System::EventArgs^  e) {
-	DBOUT("test init traps" << std::endl);
-	std::vector<std::wstring> newVec;
-	newVec.push_back(L"F:\\test2");
-	try {
-		trapHandler->initTraps(newVec);
-	}
-	catch (...) {
-		DBOUT("Failed to run traps" << std::endl);
-	}
-} 
 private: System::Void DisableProtection_CheckedChanged(System::Object^  sender, System::EventArgs^  e) {
 	if (DisableProtection->Checked) {
 		Globals::Instance->setMonitorStat(TRUE);
@@ -323,6 +300,10 @@ private: System::Void SelectRemRootDir_Click(System::Object^  sender, System::Ev
 				logViewer->AppendText(logMsgFail);
 			}
 
+			// handle traps
+
+			trapHandler->remDirTraps(selectedDir);
+
 		}
 	}
 }
@@ -345,7 +326,11 @@ private: System::Void SelectAddRootDir_Click(System::Object^  sender, System::Ev
 			String^ logMsg = String::Concat(logHead, selectedDir);
 			logViewer->AppendText(logMsg);
 
-			// do remove dir message
+			// handle traps
+
+			trapHandler->initDirTraps(selectedDir);
+
+			// do add dir message
 			NTSTATUS hr = AddFilterDirectory(selectedDir);
 			if (hr == S_OK) {
 				String^ logSuccess = gcnew String("<E> Added filter directory: ");

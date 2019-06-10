@@ -22,7 +22,7 @@ Environment :
 
 const PWSTR ComPortName = L"\\AMFilter";
 
-#define MAX_FILE_NAME_LENGTH 260
+#define MAX_FILE_NAME_LENGTH 520
 #define MAX_FILE_NAME_SIZE (MAX_FILE_NAME_LENGTH * sizeof(WCHAR))
 #define FILE_OBJECT_ID_SIZE 16
 #define FILE_OBJEC_MAX_EXTENSION_SIZE 11

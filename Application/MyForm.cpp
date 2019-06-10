@@ -154,8 +154,6 @@ HRESULT AntiRansomWareApp::MyForm::AddFilterDirectory(String ^ directory)
 	return S_FALSE;
 }
 
-
-
 BOOLEAN AntiRansomWareApp::MyForm::openKernelDriverCom() {
 	if (context.Port == nullptr) {
 		HRESULT resOpen = FilterConnectCommunicationPort(ComPortName, 0, nullptr, 0, nullptr, &context.Port);
@@ -167,20 +165,6 @@ BOOLEAN AntiRansomWareApp::MyForm::openKernelDriverCom() {
 			return FALSE;
 		}
 		Globals::Instance->setCommCloseStat(FALSE);
-
-		/*
-		context.Completion = CreateIoCompletionPort(context.Port,
-			nullptr,
-			0,
-			NUM_THREADS);
-		if (context.Completion == nullptr) {
-
-			std::cerr << "Failed to create completion port, please check settings!" << std::endl;
-			DWORD err = GetLastError();
-			std::cerr << "Error number: " << err << std::endl;
-			CloseHandle(context.Port);
-			return false;
-		}*/
 
 	}
 	return TRUE;

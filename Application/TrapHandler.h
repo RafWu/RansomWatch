@@ -3,13 +3,13 @@
 #include <random>
 #include <string>
 #include <vector>
-#include <unordered_map>
 #include <any>
 #include <filesystem>
 #include "Common.h"
 #include "Traps.h"
 #include <bcrypt.h>
-#include "HashUtility.h"
+#include <vcclr.h>
+#include <unordered_map>
 
 namespace fs = std::filesystem;
 
@@ -25,7 +25,7 @@ private:
 	std::wstring randFileName(const std::wstring& extension, std::vector<HANDLE>& vHandles);
 	FILETIME randFileTime(const std::vector<HANDLE>& vHandles);
 	std::size_t CalcFileSize(const std::vector<HANDLE>& vHandles);
-	BOOLEAN TrapGenerate(const fs::path& directory);
+	BOOLEAN TrapGenerate(const fs::directory_entry& directory);
 
 public:
 	TrapHandler() {
@@ -36,17 +36,12 @@ public:
 	~TrapHandler() {
 		delete[] Buffer;
 	}
-	// data member
-	//std::unordered_set<std::wstring> dirs;
 
-	std::wstring getFileHash(const std::wstring& filePath);
-	BOOLEAN isFileTrap(const std::wstring& filePath);
-	int initTraps(const std::vector<std::wstring>& dirs);
+	int initDirTraps(System::String ^ Path);
+	int remDirTraps(System::String^ Path);
 	int cleanTraps();
-	int addDir(const std::wstring& dirPath);
-	int remDir(const std::wstring& dirPath);
+private: int addDir(const fs::directory_entry& dirPath);
+private: int remDir(const fs::directory_entry& dirPath);
 
 
 };
-
-//static std::unordered_map<std::wstring, std::wstring> genDirTraps(const fs::path & directory);

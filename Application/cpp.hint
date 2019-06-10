@@ -2,3 +2,4 @@
 // such as names of functions and macros.
 // For more information see https://go.microsoft.com/fwlink/?linkid=865984
 #define DBOUT(s) { std::wstringstream os_; os_ << s; OutputDebugString( os_.str().c_str() ); }
+#define VOID

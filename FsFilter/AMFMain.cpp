@@ -480,7 +480,7 @@ FSProcessPreOperartion(
 	}
 	
 	UNICODE_STRING FilePath;
-	FilePath.MaximumLength = 2 * MAX_FILE_NAME_LENGTH;
+	FilePath.MaximumLength = MAX_FILE_NAME_SIZE;
 	hr = FSAllocateUnicodeString(&FilePath);
 	if (!NT_SUCCESS(hr)) {
 		delete newEntry;
@@ -490,15 +490,29 @@ FSProcessPreOperartion(
 	hr = FSEntrySetFileName(FltObjects->Volume, nameInfo, &FilePath);
 	if (!NT_SUCCESS(hr)) {
 		DbgPrint("!!! FSFilter: Failed to set file name on irp\n");
+		FSFreeUnicodeString(&FilePath);
 		delete newEntry;
 		return hr;
 	}
 	if (!FSIsFileNameInScanDirs(&FilePath)) {
 		DbgPrint("!!! FSFilter: Skipping uninterented file, not in scan area \n");
+		FSFreeUnicodeString(&FilePath);
 		delete newEntry;
 		return FLT_PREOP_SUCCESS_NO_CALLBACK;
 	}
+	if (Data->Iopb->MajorFunction == IRP_MJ_READ || Data->Iopb->MajorFunction == IRP_MJ_WRITE) {
+		DbgPrint("!!! FSFilter: copying the file type extension \n");
+		RtlZeroBytes(newItem->Extension, (FILE_OBJEC_MAX_EXTENSION_SIZE + 1) * sizeof(WCHAR));
+		for (LONG i = 0; i < (nameInfo->Extension.Length / 2) ; i++) {
+			if (i == FILE_OBJEC_MAX_EXTENSION_SIZE + 1) break;
+			newItem->Extension[i] = nameInfo->Extension.Buffer[i];
+		}
+		
+	}
+
 	FSFreeUnicodeString(&FilePath);
+
+	FltReleaseFileNameInformation(nameInfo);
 
 	hr = FLT_PREOP_SUCCESS_NO_CALLBACK;
 	// reset
@@ -509,7 +523,7 @@ FSProcessPreOperartion(
 	
 	switch (Data->Iopb->MajorFunction) {
 
-		//create is handled on post operation, read is created here but calculated on post(data avilable
+	//create is handled on post operation, read is created here but calculated on post(data avilable
 	case IRP_MJ_READ:
 	{
 		newItem->IRP_OP = IRP_READ;
@@ -735,6 +749,8 @@ FSProcessCreateIrp(
 		delete newEntry;
 		return FLT_POSTOP_FINISHED_PROCESSING;
 	}
+
+	FltReleaseFileNameInformation(nameInfo);
 	
 	// reset entropy
 	newItem->FileChange = FILE_CHANGE_NOT_SET;
@@ -903,7 +919,7 @@ FSEntrySetFileName(
 	WCHAR newTemp[MAX_FILE_NAME_LENGTH];
 
 	UNICODE_STRING volumeData;
-	volumeData.MaximumLength = 2 * MAX_FILE_NAME_LENGTH;
+	volumeData.MaximumLength = MAX_FILE_NAME_SIZE;
 	volumeData.Buffer = newTemp;
 	volumeData.Length = 0;
 	
@@ -935,9 +951,9 @@ FSEntrySetFileName(
 		DbgPrint("File name: %wZ\n", uString);
 		RtlCopyMemory(uString->Buffer + (volumeDosNameSize / 2),
 			nameInfo->Name.Buffer + (volumeNameSize / 2),
-			((finalNameSize - volumeDosNameSize > 2 * MAX_FILE_NAME_LENGTH - volumeDosNameSize) ? ( 2* MAX_FILE_NAME_LENGTH - volumeDosNameSize) : (finalNameSize - volumeDosNameSize))
+			((finalNameSize - volumeDosNameSize > MAX_FILE_NAME_SIZE - volumeDosNameSize) ? (MAX_FILE_NAME_SIZE - volumeDosNameSize) : (finalNameSize - volumeDosNameSize))
 		);
-		uString->Length = (finalNameSize > 2 * MAX_FILE_NAME_LENGTH) ? 2 * MAX_FILE_NAME_LENGTH : finalNameSize;
+		uString->Length = (finalNameSize > MAX_FILE_NAME_SIZE) ? MAX_FILE_NAME_SIZE : finalNameSize;
 		DbgPrint("File name: %wZ\n", uString);	
 	}
 	return hr;
