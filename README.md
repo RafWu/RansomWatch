@@ -5,18 +5,18 @@ Anti ransomware application and mini-filter driver, log IRP operations in kernel
 ## Open issues
 
 1. Define the detection module (before coding).
-2. fix cpython to run python modules - define location to deploy
-3. fix driver context : pid, path, time, IRP op, entropy, file id.
-4. add traps recursivly by directory.
-5. traps removing scheme
+2. fix cpython to run python modules - define location to deploy - REMOVED
+3. fix driver context : pid, path, time, IRP op, entropy, file id. - DONE except time
+4. add traps recursivly by directory. - DONE
+5. traps removing scheme - DONE
 6. create alghoritm for adding traps at startup
 7. improve gui
 8. remedy plan - copy file to blob storage when write/rename/delete is done to it by untrusted process
-9. calculation of entropy of file in case of write/rename/cleanup
-10. model for counting files in system
-11. kernel worker (work item) for calculating entropy
-12. handle registry changes in kernel driver, we want to report registry changes also.
-13. detect windows internel processess from all processess in kernel (kernel components)
+9. calculation of entropy of file in case of write/rename/cleanup - DONE
+10. model for counting files in system - DONE in add rem dir handled
+11. kernel worker (work item) for calculating entropy - DONE
+12. handle registry changes in kernel driver, we want to report registry changes also. - DONE
+13. detect windows internel processess from all processess in kernel (kernel components) - half done
 
 ## Getting Started
 
