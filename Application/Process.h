@@ -258,12 +258,12 @@ ref struct ProcessRecord {
 	{
 		DBOUT("Update create info for irp message " << fileChangeEnum << "\n");
 		FileId newId(idInfo);
-		DBOUT("File id: ");
+		/*DBOUT("File id: ");
 		for (ULONG i = 0; i < FILE_OBJECT_ID_SIZE ; i++)
 		{
 			DBOUT(newId.fileId[i] << " ");
 		}
-		DBOUT("\n");
+		DBOUT("\n");*/
 		if (IsFileIdTrapFIle(newId)) {
 			trapsOpened++;
 		}
@@ -271,10 +271,10 @@ ref struct ProcessRecord {
 		switch (fileChangeEnum) {
 		case FILE_CHANGE_NEW_FILE:
 		{
-			DBOUT("fileIdsCreate in\n");
+			//DBOUT("fileIdsCreate in\n");
 			filesCreatedCount++;
 			fileIdsCreate->Add(newId);
-			DBOUT("fileIdsCreate out\n");
+			//DBOUT("fileIdsCreate out\n");
 			break;
 		}
 		case FILE_CHANGE_OVERWRITE_FILE: // file is overwritten
@@ -299,9 +299,9 @@ ref struct ProcessRecord {
 			break;
 		}
 		default:
-			DBOUT("fileIdsOpened in \n");
+			//DBOUT("fileIdsOpened in \n");
 			if (fileIdsOpened->Add(newId)) filesOpenedCount++;
-			DBOUT("fileIdsOpened out, size fileIdsOpened: " << filesOpenedCount << "\n");
+			//DBOUT("fileIdsOpened out, size fileIdsOpened: " << filesOpenedCount << "\n");
 			
 			break;
 		}
@@ -324,7 +324,14 @@ ref struct ProcessRecord {
 		// extensions
 		
 		if (extensionsWrite->Add(gcnew String(Extension))) {
+			DBOUT("Added extension " << Extension << std::endl);
+			System::String^ newMsg = gcnew String(Extension);
+			newMsg = System::String::Concat(newMsg, "IRP_MJ_WRITE added extension: ", System::Environment::NewLine);
+			Globals::Instance->postLogMessage(newMsg);
 			fileExtensionTypesWrite++;
+		}
+		else {
+			DBOUT("No extension to add " << Extension << std::endl);
 		}
 
 		//handle entropy
@@ -349,7 +356,14 @@ ref struct ProcessRecord {
 		// extensions
 		
 		if (extensionsRead->Add(gcnew String(Extension))) {
+			DBOUT("Added extension " << Extension << std::endl);
+			System::String^ newMsg = gcnew String(Extension);
+			newMsg = System::String::Concat(newMsg, "IRP_MJ_READ added extension: ", System::Environment::NewLine);
+			Globals::Instance->postLogMessage(newMsg);
 			fileExtensionTypesRead++;
+		}
+		else {
+			DBOUT("No extension to add " << Extension << std::endl);
 		}
 
 		//handle entropy

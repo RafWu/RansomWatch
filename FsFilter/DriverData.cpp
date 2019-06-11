@@ -10,8 +10,8 @@ DriverData::DriverData(PDRIVER_OBJECT DriverObject) : FilterRun(FALSE), DriverOb
 
 DriverData::~DriverData()
 {
-	// TODO: clear lists heads
-	//Clear();
+	
+	Clear();
 	
 }
 

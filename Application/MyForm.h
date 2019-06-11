@@ -55,9 +55,6 @@ namespace AntiRansomWareApp {
 		{
 			dragging = false;
 			InitializeComponent();
-			//
-			//TODO: Add the constructor code here
-			//
 			context.Port = nullptr;
 			Globals::Instance->setTextBox(logViewer);
 			//context.Completion = nullptr;

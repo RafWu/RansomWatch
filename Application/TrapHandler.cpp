@@ -106,8 +106,7 @@ std::size_t TrapHandler::CalcFileSize(const std::vector<HANDLE>& vHandles) {
 		retval = sizeRand(rng) + randAddition(rng);
 	}
 	catch (std::exception& e) {
-		// TODO: debug. it shouldn't throw normally,
-		// but if it does we don't want our application to crash because of it
+		// it shouldn't throw normally, but if it does we don't want our application to crash because of it
 	}
 	return retval;
 
@@ -271,7 +270,7 @@ int TrapHandler::cleanTraps() {
 int TrapHandler::addDir(const fs::directory_entry& dirPath) {
 	DBOUT("Adding directory to traps handling " << dirPath << std::endl);
 	System::String^ PathSystem = gcnew System::String(dirPath.path().c_str());
-	if (dirPath.exists()) { // TODO: throw and catch
+	if (dirPath.exists()) {
 		DBOUT("Directory exist, checking if traps already exist" << std::endl);
 		if (!TrapsMemory::Instance->traps->ContainsKey(PathSystem)) {
 			TrapGenerate(dirPath);
@@ -294,26 +293,31 @@ int TrapHandler::remDir(const fs::directory_entry& dirPath) {
 	DBOUT("Removing directory from traps handling" << dirPath << std::endl);
 	fs::path directory = dirPath;
 	if (!dirPath.exists()) {
-		throw "Not a valid directory"; // TODO: throw and catch
+		throw "Not a valid directory";
 	}
 	Generic::List<TrapRecord^>^ trapRecords = nullptr;
 	if (TrapsMemory::Instance->traps->TryGetValue(Path, trapRecords) && trapRecords != nullptr) {
 		if (trapRecords != nullptr) {
 			
 			for each (TrapRecord ^ record in trapRecords) {
-				
+
 				System::String^ filePath = record->getFilePath();
 				pin_ptr<const wchar_t> wch = PtrToStringChars(filePath);
 				std::wstring filePathStr(wch);
 				DBOUT("Removing file: " << filePathStr << std::endl);
-				
+
 				FileId id = record->getFileId();
 				TrapRecord^ tmp;
 				TrapsMemory::Instance->fileIdToTrapRecord->TryRemove(id, tmp); //unlink
-
+				try {
 				fs::path fileFsPath(filePathStr);
 				if (!fs::remove(fileFsPath)) {
 					DBOUT("Failed to remove file: " << filePathStr << std::endl);
+					retVal = EXIT_FAILURE; // FIXME: throw
+				}
+				}
+				catch (const std::exception& exp) {
+					DBOUT("Failed to remove file: " << exp.what() << std::endl);
 					retVal = EXIT_FAILURE; // FIXME: throw
 				}
 				

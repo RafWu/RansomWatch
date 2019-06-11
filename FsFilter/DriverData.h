@@ -50,7 +50,7 @@ public:
 
 		KIRQL irql = KeGetCurrentIrql();
 		KeAcquireSpinLock(&irpOpsLock, &irql);
-		if (irpOpsSize < 0x9000) { // TODO : to define in sharedDefs
+		if (irpOpsSize < MAX_OPS_SAVE) {
 			irpOpsSize++;
 			InsertTailList(&irpOps, &newEntry->entry);
 		}

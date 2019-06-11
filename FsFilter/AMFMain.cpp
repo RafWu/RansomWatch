@@ -377,7 +377,7 @@ Return Value:
 	NTSTATUS hr;
 
 	//  See if this create is being done by our user process.
-
+	if (FltGetRequestorProcessId(Data) == 4) return FLT_PREOP_SUCCESS_NO_CALLBACK; // system process -  skip
 	if (FltGetRequestorProcessId(Data) == driverData->getPID()) {
 
 		DbgPrint("!!! FSFilter: Allowing pre op for trusted process, no post op\n");
@@ -501,14 +501,16 @@ FSProcessPreOperartion(
 		return FLT_PREOP_SUCCESS_NO_CALLBACK;
 	}
 	if (Data->Iopb->MajorFunction == IRP_MJ_READ || Data->Iopb->MajorFunction == IRP_MJ_WRITE) {
-		DbgPrint("!!! FSFilter: copying the file type extension \n");
+		DbgPrint("!!! FSFilter: copying the file type extension, extension length: %d, name: %wZ\n", nameInfo->Extension.Length, nameInfo->Extension);
 		RtlZeroBytes(newItem->Extension, (FILE_OBJEC_MAX_EXTENSION_SIZE + 1) * sizeof(WCHAR));
-		for (LONG i = 0; i < (nameInfo->Extension.Length / 2) ; i++) {
-			if (i == FILE_OBJEC_MAX_EXTENSION_SIZE + 1) break;
+		for (LONG i = 0; i < FILE_OBJEC_MAX_EXTENSION_SIZE ; i++) {
+			if (i == (nameInfo->Extension.Length / 2)) break;
 			newItem->Extension[i] = nameInfo->Extension.Buffer[i];
 		}
 		
 	}
+
+	DbgPrint("!!! FSFilter: Logging IRP op: %s \n", FltGetIrpName(Data->Iopb->MajorFunction));
 
 	FSFreeUnicodeString(&FilePath);
 
@@ -529,8 +531,18 @@ FSProcessPreOperartion(
 		newItem->IRP_OP = IRP_READ;
 		if (Data->Iopb->Parameters.Read.Length == 0) // no data to read
 		{
-			break;
+			if (Data->Iopb->Parameters.Read.MdlAddress != NULL) { // fast io
+				if (Data->Iopb->Parameters.Read.MdlAddress->Size == 0) {
+					DbgPrint("!!! FSFilter: Preop IRP_MJ_READ, nothing to read \n");
+					break;
+				}
+			}
+			else {
+				DbgPrint("!!! FSFilter: Preop IRP_MJ_READ, nothing to read \n");
+				break;
+			}
 		}
+		DbgPrint("!!! FSFilter: Preop IRP_MJ_READ, return with postop \n");
 		// save context for post, we calculate the entropy of read, we pass the irp to application on post op
 		*CompletionContext = newEntry;
 		return FLT_PREOP_SUCCESS_WITH_CALLBACK;
@@ -595,7 +607,7 @@ FSProcessPreOperartion(
 		}
 		else if (fileInfo == FileRenameInformation || fileInfo == FileRenameInformationEx) {
 			newItem->FileChange = FILE_CHANGE_RENAME_FILE;
-			// TODO: get new name?
+			// OPTIONAL: get new name?
 		}
 		else {
 			delete newEntry;
@@ -608,7 +620,7 @@ FSProcessPreOperartion(
 		return FLT_PREOP_SUCCESS_NO_CALLBACK;
 	}
 	//delete newEntry;
-	DbgPrint("!!! FSFilter: Addung entry to irps\n");
+	DbgPrint("!!! FSFilter: Addung entry to irps %s\n", FltGetIrpName(Data->Iopb->MajorFunction));
 	driverData->AddIrpMessage(newEntry);
 	
 	return hr;
@@ -843,7 +855,7 @@ FSProcessPostReadIrp(
 		Data->IoStatus.Information = 0;
 		return FLT_POSTOP_FINISHED_PROCESSING;
 	}
-	DbgPrint("!!! FSFilter: Addung entry to irps\n");
+	DbgPrint("!!! FSFilter: Addung entry to irps IRP_MJ_READ\n");
 	driverData->AddIrpMessage(entry);
 	return FLT_POSTOP_FINISHED_PROCESSING;
 }
@@ -871,7 +883,7 @@ FSProcessPostReadSafe(
 				entry->data.Entropy = shannonEntropy((PUCHAR)ReadBuffer, Data->IoStatus.Information);
 				entry->data.MemSizeUsed = Data->IoStatus.Information;
 				entry->data.isEntropyCalc = TRUE;
-				DbgPrint("!!! FSFilter: Addung entry to irps\n");
+				DbgPrint("!!! FSFilter: Addung entry to irps IRP_MJ_READ\n");
 				driverData->AddIrpMessage(entry);
 				return FLT_POSTOP_FINISHED_PROCESSING;
 			}
@@ -935,8 +947,8 @@ FSEntrySetFileName(
 	volumeDosNameSize = volumeData.Length;
 	finalNameSize = origNameSize - volumeNameSize + volumeDosNameSize; // not null terminated, in bytes
 
-	DbgPrint("Volume name: %wZ, Size: %d, finalNameSize: %d, volumeNameSize: %d\n", volumeData, volumeDosNameSize, finalNameSize, volumeNameSize);
-	DbgPrint("Name buffer: %wZ\n", nameInfo->Name);
+	//DbgPrint("Volume name: %wZ, Size: %d, finalNameSize: %d, volumeNameSize: %d\n", volumeData, volumeDosNameSize, finalNameSize, volumeNameSize);
+	//DbgPrint("Name buffer: %wZ\n", nameInfo->Name);
 	
 	if (uString == NULL) {
 		return STATUS_INVALID_ADDRESS;
@@ -948,13 +960,13 @@ FSEntrySetFileName(
 	
 	if (NT_SUCCESS(hr = RtlUnicodeStringCopy(uString, &volumeData))) {// prefix of volume e.g. C:
 
-		DbgPrint("File name: %wZ\n", uString);
+		//DbgPrint("File name: %wZ\n", uString);
 		RtlCopyMemory(uString->Buffer + (volumeDosNameSize / 2),
 			nameInfo->Name.Buffer + (volumeNameSize / 2),
 			((finalNameSize - volumeDosNameSize > MAX_FILE_NAME_SIZE - volumeDosNameSize) ? (MAX_FILE_NAME_SIZE - volumeDosNameSize) : (finalNameSize - volumeDosNameSize))
 		);
 		uString->Length = (finalNameSize > MAX_FILE_NAME_SIZE) ? MAX_FILE_NAME_SIZE : finalNameSize;
-		DbgPrint("File name: %wZ\n", uString);	
+		//DbgPrint("File name: %wZ\n", uString);	
 	}
 	return hr;
 }
