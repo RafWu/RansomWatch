@@ -9,9 +9,10 @@ using namespace System;
 #include "Traps.h"
 #include "Thresholds.h"
 
-ref struct ProcessRecord {
+ref class ProcessRecord {
 	ULONG pid;
-	BOOLEAN isMalicious;
+	BOOLEAN malicious;
+	BOOLEAN killed;
 	String^ appName;
 	ULONGLONG totalReadOperations;
 	ULONGLONG totalWriteOperations;
@@ -23,8 +24,7 @@ ref struct ProcessRecord {
 	ULONGLONG trapsOpened;
 	ULONGLONG trapsRenameDelete;
 	
-	ULONGLONG dirListingOps;
-
+	ULONGLONG dirListingCount;
 	ULONGLONG filesOpenedCount;
 	ULONGLONG filesCreatedCount;
 	ULONGLONG filesWrittenCount;
@@ -35,6 +35,7 @@ ref struct ProcessRecord {
 	ULONGLONG filesDeletedCount;
 	ULONGLONG filesExtensionChanged;
 
+	Generic::HashSet<FileId>^ dirsListed;
 	Generic::HashSet<FileId>^ fileIdsOpened;
 	Generic::HashSet<FileId>^ fileIdsCreate;
 	Generic::HashSet<FileId>^ fileIdsWrite;
@@ -42,7 +43,8 @@ ref struct ProcessRecord {
 	Generic::HashSet<FileId>^ fileIdsRenamed;
 	Generic::HashSet<FileId>^ fileIdsMoveIn;
 	Generic::HashSet<FileId>^ fileIdsMoveOut;
-	Generic::List<String^>^		 filesDeleted;   // paths
+	Generic::List<String^>^	  filesDeleted;   // paths
+	Generic::SortedSet<String^>^ triggersBreached;   // triggers that were breached, we use this to report later
 
 	ULONG fileExtensionTypesWrite;
 	ULONG fileExtensionTypesRead;
@@ -51,18 +53,17 @@ ref struct ProcessRecord {
 
 	DOUBLE averegeReadEntropy;
 	DOUBLE averegeWriteEntropy;
-	//ULONGLONG highEntropyReplaces;
 	
 	ULONGLONG totalReadBytes;
 	ULONGLONG totalWriteBytes;
 
-	//ULONGLONG LZJDDistanceExceededFiles;
-	//ULONGLONG LZJDDistanceCalculatedFiles;
+	ULONGLONG highEntropyWrites;
 
-	ProcessRecord() {
+	public: ProcessRecord() {
 		pid = 0;
 		appName = nullptr;
-		isMalicious = FALSE;
+		malicious = FALSE;
+		killed = FALSE;
 
 		totalReadOperations = 0;
 		totalWriteOperations = 0;
@@ -74,8 +75,7 @@ ref struct ProcessRecord {
 		trapsOpened = 0;
 		trapsRenameDelete = 0;
 
-		dirListingOps = 0;
-
+		dirListingCount = 0;
 		filesOpenedCount = 0;
 		filesCreatedCount = 0;
 		filesWrittenCount = 0;
@@ -85,7 +85,8 @@ ref struct ProcessRecord {
 		filesMovedOutCount = 0;
 		filesDeletedCount = 0;
 		filesExtensionChanged = 0;
-
+		
+		dirsListed = gcnew Generic::HashSet<FileId>;
 		fileIdsOpened = gcnew Generic::HashSet<FileId>;
 		fileIdsCreate = gcnew Generic::HashSet<FileId>;
 		fileIdsWrite = gcnew Generic::HashSet<FileId>;
@@ -94,6 +95,7 @@ ref struct ProcessRecord {
 		fileIdsMoveIn = gcnew Generic::HashSet<FileId>;
 		fileIdsMoveOut = gcnew Generic::HashSet<FileId>;
 		filesDeleted = gcnew Generic::List<String^>;
+		triggersBreached = gcnew Generic::SortedSet<String^>;
 
 		fileExtensionTypesWrite = 0;
 		fileExtensionTypesRead = 0;
@@ -107,9 +109,10 @@ ref struct ProcessRecord {
 		totalReadBytes = 0;
 		totalWriteBytes = 0;
 
-	}
+		highEntropyWrites = 0;
 
-	ProcessRecord(ULONG PID) {
+	}
+	public: ProcessRecord(ULONG PID) {
 		pid = PID;
 		appName = nullptr;
 		HANDLE h = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ,
@@ -134,8 +137,9 @@ ref struct ProcessRecord {
 			CloseHandle(h);
 		}
 
-		isMalicious = FALSE;
-		
+		malicious = FALSE;
+		killed = FALSE;
+
 		totalReadOperations = 0;
 		totalWriteOperations = 0;
 		totalRenameOperations = 0;
@@ -146,8 +150,7 @@ ref struct ProcessRecord {
 		trapsOpened = 0;
 		trapsRenameDelete = 0;
 
-		dirListingOps = 0;
-
+		dirListingCount = 0;
 		filesOpenedCount = 0;
 		filesCreatedCount = 0;
 		filesWrittenCount = 0;
@@ -158,6 +161,7 @@ ref struct ProcessRecord {
 		filesDeletedCount = 0;
 		filesExtensionChanged = 0;
 
+		dirsListed = gcnew Generic::HashSet<FileId>;
 		fileIdsOpened  = gcnew Generic::HashSet<FileId>;
 		fileIdsCreate = gcnew Generic::HashSet<FileId>;
 		fileIdsWrite = gcnew Generic::HashSet<FileId>;
@@ -166,6 +170,7 @@ ref struct ProcessRecord {
 		fileIdsMoveIn = gcnew Generic::HashSet<FileId>;
 		fileIdsMoveOut = gcnew Generic::HashSet<FileId>;
 		filesDeleted = gcnew Generic::List<String^>;
+		triggersBreached = gcnew Generic::SortedSet<String^>;
 
 		fileExtensionTypesWrite = 0;
 		fileExtensionTypesRead = 0;
@@ -179,18 +184,21 @@ ref struct ProcessRecord {
 		totalReadBytes = 0;
 		totalWriteBytes = 0;
 
-	}
+		highEntropyWrites = 0;
 
-	BOOLEAN AddIrpRecord(const DRIVER_MESSAGE& Irp) {
+	}
+	public: BOOLEAN AddIrpRecord(const DRIVER_MESSAGE& Irp) {
+		
+		System::String^ newMsg = "Recieved an irp request: ";
+		newMsg = System::String::Concat(newMsg, Irp.IRP_OP.ToString(), " From process id: ", Irp.PID.ToString(), " AppName: ", appName, System::Environment::NewLine);
+		Globals::Instance->postLogMessage(newMsg);
+		
 		Monitor::Enter(this);
 		// FIXME: add to fields, check file id and add to new file accordingly
 
 		//DBOUT("Recived irp: " << Irp.IRP_OP << " process pid: " << Irp.PID);
-		System::String^ newMsg = "Recieved an irp request: ";
-		newMsg = System::String::Concat(newMsg, Irp.IRP_OP.ToString(), " From process id: ", Irp.PID.ToString(), System::Environment::NewLine);
-		Globals::Instance->postLogMessage(newMsg);
-		//Globals::Instance->getTextBox()->AppendText(newMsg);
 
+		//Globals::Instance->getTextBox()->AppendText(newMsg);
 		switch (Irp.IRP_OP) 
 		{
 			case IRP_SETINFO: 
@@ -231,12 +239,7 @@ ref struct ProcessRecord {
 		return TRUE;
 	}
 
-	BOOLEAN IsFileIdTrapFIle(FileId id) {
-		if (TrapsMemory::Instance->fileIdToTrapRecord->ContainsKey(id)) return TRUE;
-		return FALSE;
-	}
-
-	void UpdateSetInfo(UCHAR fileChangeEnum, const FILE_ID_INFO& idInfo) {
+	public: void UpdateSetInfo(UCHAR fileChangeEnum, const FILE_ID_INFO& idInfo) {
 		DBOUT("Update set info for irp message\n");
 		FileId newId(idInfo);
 		if (IsFileIdTrapFIle(newId)) {
@@ -254,7 +257,7 @@ ref struct ProcessRecord {
 
 	}
 
-	void UpdateCreateInfo(UCHAR fileChangeEnum, const FILE_ID_INFO& idInfo) 
+	private: void UpdateCreateInfo(UCHAR fileChangeEnum, const FILE_ID_INFO& idInfo) 
 	{
 		DBOUT("Update create info for irp message " << fileChangeEnum << "\n");
 		FileId newId(idInfo);
@@ -295,7 +298,7 @@ ref struct ProcessRecord {
 		}
 		case FILE_OPEN_DIRECTORY: // directory listing
 		{
-			dirListingOps++;
+			if (dirsListed->Add(newId)) dirListingCount++;
 			break;
 		}
 		default:
@@ -309,7 +312,7 @@ ref struct ProcessRecord {
 
 	}
 
-	void UpdateWriteInfo(DOUBLE entropy, ULONGLONG writeSize, const LPCWSTR Extension, const FILE_ID_INFO& idInfo)
+	private: void UpdateWriteInfo(DOUBLE entropy, ULONGLONG writeSize, const LPCWSTR Extension, const FILE_ID_INFO& idInfo)
 	{
 		DBOUT("Update write info for irp message\n");
 		FileId newId(idInfo);
@@ -325,13 +328,16 @@ ref struct ProcessRecord {
 		
 		if (extensionsWrite->Add(gcnew String(Extension))) {
 			DBOUT("Added extension " << Extension << std::endl);
-			System::String^ newMsg = gcnew String(Extension);
-			newMsg = System::String::Concat(newMsg, "IRP_MJ_WRITE added extension: ", System::Environment::NewLine);
-			Globals::Instance->postLogMessage(newMsg);
+			//System::String^ newMsg = gcnew String(Extension);
+			//newMsg = System::String::Concat(newMsg, "IRP_MJ_WRITE added extension: ", System::Environment::NewLine);
+			//Globals::Instance->postLogMessage(newMsg);
 			fileExtensionTypesWrite++;
 		}
 		else {
 			DBOUT("No extension to add " << Extension << std::endl);
+		}
+		if (entropy > ENTROPY_THRESHOLD) {
+			highEntropyWrites++;
 		}
 
 		//handle entropy
@@ -341,7 +347,7 @@ ref struct ProcessRecord {
 		totalWriteOperations++;
 	}
 
-	void UpdateReadInfo(DOUBLE entropy, ULONGLONG readSize, const LPCWSTR Extension, const FILE_ID_INFO& idInfo)
+	private: void UpdateReadInfo(DOUBLE entropy, ULONGLONG readSize, const LPCWSTR Extension, const FILE_ID_INFO& idInfo)
 	{
 		DBOUT("Update read info for irp message\n");
 		FileId newId(idInfo);
@@ -357,9 +363,9 @@ ref struct ProcessRecord {
 		
 		if (extensionsRead->Add(gcnew String(Extension))) {
 			DBOUT("Added extension " << Extension << std::endl);
-			System::String^ newMsg = gcnew String(Extension);
-			newMsg = System::String::Concat(newMsg, "IRP_MJ_READ added extension: ", System::Environment::NewLine);
-			Globals::Instance->postLogMessage(newMsg);
+			//System::String^ newMsg = gcnew String(Extension);
+			//newMsg = System::String::Concat(newMsg, "IRP_MJ_READ added extension: ", System::Environment::NewLine);
+			//Globals::Instance->postLogMessage(newMsg);
 			fileExtensionTypesRead++;
 		}
 		else {
@@ -373,12 +379,107 @@ ref struct ProcessRecord {
 		totalReadOperations++;
 	}
 
-	BOOLEAN isProcessMalicious() {
-		
+	// assumes that caller protect this call
+	public: BOOLEAN isMalicious() {
+		return malicious;
+	}
 
+	// assumes that caller protect this call
+	public: BOOLEAN isKilled() {
+		return killed;
+	}
+	
+	// assumes that caller protect this call
+	public: VOID setKilled() {
+		killed = TRUE;
+	}
+
+	// assumes that caller protect this call
+	public: ULONG Pid() {
+		return pid;
+	}
+	// assumes that caller protect this call
+	public: String^ Name() {
+		return appName;
+	}
+
+	public: BOOLEAN isProcessMalicious() {
+		Monitor::Enter(this);
+
+		BOOLEAN deleteTrigger = DeletionTrigger();
+		if (deleteTrigger) {
+			triggersBreached->Add("Delete");
+		}
+		BOOLEAN createTrigger = CreationTrigger();
+		if (createTrigger) {
+			triggersBreached->Add("Create");
+		}
+		BOOLEAN renameTrigger = RenamingTrigger();
+		if (renameTrigger) {
+			triggersBreached->Add("Renaming");
+		}
+		BOOLEAN listingTrigger = ListingTrigger();
+		if (listingTrigger) {
+			triggersBreached->Add("Listing");
+		}
+		BOOLEAN highEntropyTrigger = HighEntropyTrigger();
+		if (highEntropyTrigger) {
+			triggersBreached->Add("High entropy writes");
+		}
+		BOOLEAN extensionsTrigger = FileExtensionsTrigger();
+		if (extensionsTrigger) {
+			triggersBreached->Add("Extensions");
+		}
+		BOOLEAN writeFilesTrigger = WriteToFilesTrigger(); // compared to read files number
+		if (writeFilesTrigger) {
+			triggersBreached->Add("High writes threshold");
+		}
+		BOOLEAN trapsTrigger = TrapsTrigger(); // checked in other trigger but we do raise another trigger when work on traps reached certain point
+		if (trapsTrigger) {
+			triggersBreached->Add("Traps operations");
+		}
+
+		BYTE triggersReached = deleteTrigger + createTrigger + renameTrigger + listingTrigger +
+			highEntropyTrigger + extensionsTrigger + writeFilesTrigger + trapsTrigger;
+		if (triggersReached >= TRIGGERS_TRESHOLD && highEntropyWrites >= NUM_WRITES_FOR_TRIGGER) {
+			malicious = TRUE;
+			Monitor::Exit(this);
+			return TRUE;
+		}
+
+		Monitor::Exit(this);
 		return FALSE;
 	}
 
+	private: BOOLEAN IsFileIdTrapFIle(FileId id) {
+		if (TrapsMemory::Instance->fileIdToTrapRecord->ContainsKey(id)) return TRUE;
+		return FALSE;
+	}
+
+	private: BOOLEAN DeletionTrigger() {
+		return FALSE;
+	}
+	private: BOOLEAN CreationTrigger() {
+		return FALSE;
+	}
+	private: BOOLEAN RenamingTrigger() {
+		return FALSE;
+	}
+	private: BOOLEAN ListingTrigger() {
+		return FALSE;
+	}
+	private: BOOLEAN HighEntropyTrigger() {
+		return FALSE;
+	}
+	private: BOOLEAN FileExtensionsTrigger() {
+		return FALSE;
+	}
+	private: BOOLEAN WriteToFilesTrigger() {
+		return FALSE;
+	}
+	private: BOOLEAN TrapsTrigger() {
+		return FALSE;
+	}
 };
 
 ref class ProcessesMemory {

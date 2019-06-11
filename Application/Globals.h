@@ -11,7 +11,7 @@ using namespace System::Threading;
 ref class Globals {
 private:
 	BOOLEAN isKillProcess = TRUE;
-	BOOLEAN isisMonitorStopped = FALSE;
+	BOOLEAN isMonitorStopped = FALSE;
 	BOOLEAN isCommClosed = TRUE;
 	ULONGLONG TotalIrpsHandled = 0;
 	ULONGLONG numOfFilesProtected = 0;
@@ -137,14 +137,14 @@ public:
 	BOOLEAN getMonitorStat() {
 		BOOLEAN ret;
 		Monitor::Enter(this);
-		ret = isisMonitorStopped;
+		ret = isMonitorStopped;
 		Monitor::Exit(this);
 		return ret;
 	}
 
 	BOOLEAN setMonitorStat(BOOLEAN newStat) {
 		Monitor::Enter(this);
-		isisMonitorStopped = newStat;
+		isMonitorStopped = newStat;
 		Monitor::Exit(this);
 		return newStat;
 	}

@@ -14,4 +14,6 @@ FilterWorker(
 
 HRESULT ProcessIrp(const DRIVER_MESSAGE & msg);
 
-VOID CheckHandleMaliciousApplication(ULONG pid);
+VOID HandleMaliciousApplication(ProcessRecord^ record, HANDLE comPort);
+
+VOID CheckHandleMaliciousApplication(ULONG pid, HANDLE comPort);

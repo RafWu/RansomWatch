@@ -238,15 +238,25 @@ int TrapHandler::remDirTraps(System::String^ Path) {
 	pin_ptr<const wchar_t> wch = PtrToStringChars(Path);
 	std::wstring directoryStr(wch);
 	fs::path Directory(directoryStr);
+	ULONGLONG dirFiles = 0;
+	ULONGLONG dirSubDirs = 0;
 	if (TrapsMemory::Instance->traps->ContainsKey(Path)) {
 		for (auto& pDir : fs::recursive_directory_iterator(Directory)) { //iterate recursively
 			if (pDir.is_directory() && remDir(pDir) == EXIT_FAILURE) {
 				ret = EXIT_FAILURE;
 			}
+			if (pDir.is_directory()) {
+				dirSubDirs++;
+			}
+			else {
+				dirFiles++;
+			}
 		}
 		if (fs::is_directory(Directory) && remDir(fs::directory_entry(Directory)) == EXIT_FAILURE) {
 			ret = EXIT_FAILURE;
 		}
+		Globals::Instance->redNumOfDirsProtected(dirSubDirs);
+		Globals::Instance->redNumOfFilesProtected(dirFiles);
 	}
 	else {
 		return EXIT_FAILURE;

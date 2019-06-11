@@ -64,7 +64,7 @@ value struct FileId {
 	}
 
 	virtual int GetHashCode() override {
-		//interior_ptr<ULONG> ptr = &volumeSerialNumber;
+		// FIXME: improve hashing of file id
 		ULONG val1 = static_cast<ULONG> (volumeSerialNumber);
 		ULONG val2 = static_cast<ULONG>((volumeSerialNumber >> (sizeof(ULONG) * 8)));
 		ULONG val3 = (((ULONG)(fileId[0])) | (((ULONG)(fileId[1])) << 8) | (((ULONG)(fileId[2])) << 16) | (((ULONG)(fileId[3])) << 24));

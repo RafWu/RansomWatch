@@ -3,10 +3,6 @@
 using namespace System;
 using namespace System::Windows::Forms;
 
-//globalSettings globals;
-
-//SCANNER_THREAD_CONTEXT context;
-
 HRESULT AntiRansomWareApp::MyForm::initWorkThread() {
 	DWORD numOfThreads = NUM_THREADS;
 	//P msg;
@@ -79,8 +75,6 @@ void AntiRansomWareApp::MyForm::closeKernelDriverCom() {
 	// may need to check first kernel driver state, if the driver didnt dissconnect we need to send it a message first
 	Globals::Instance->setCommCloseStat(TRUE);
 	CloseHandle(context.Port);
-
-	//CloseHandle(context.Completion);
 }
 
 HRESULT AntiRansomWareApp::MyForm::RemoveFilterDirectory(String ^ directory)
@@ -143,10 +137,10 @@ HRESULT AntiRansomWareApp::MyForm::AddFilterDirectory(String ^ directory)
 		return S_FALSE;
 	}
 	
-	System::String^ pre = "<I> added irps so far: ";
-	System::String^ msg = System::String::Concat(pre, Globals::Instance->getIrpHandled().ToString());
-	msg = System::String::Concat(msg, "\n");
-	logViewer->AppendText(msg);
+	//System::String^ pre = "<I> added irps so far: ";
+	//System::String^ msg = System::String::Concat(pre, Globals::Instance->getIrpHandled().ToString());
+	//msg = System::String::Concat(msg, "\n");
+	//logViewer->AppendText(msg);
 	if (retSize == 1 && retOp == TRUE) { //reply op
 		return S_OK;
 	}

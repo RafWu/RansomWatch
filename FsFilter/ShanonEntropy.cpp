@@ -1,4 +1,3 @@
-//extern "C" { unsigned int _fltused = 1; }
 
 #include "ShanonEntropy.h"
 

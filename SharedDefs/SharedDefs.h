@@ -63,10 +63,10 @@ enum IRP_MAJOR_OP {
 	IRP_CLEANUP 
 };
 
-// -64- bytes structure, fixed to 96 bytes, hold pointer to fileName and its size, used for create and cleanup/close to handle fileName(needed for LZJD)
-// FIXME: handle Extension in kernel and application
+// -64- bytes structure, fixed to 72 bytes
 typedef struct _DRIVER_MESSAGE {
 	WCHAR Extension[FILE_OBJEC_MAX_EXTENSION_SIZE + 1]; // null terminated 24 bytes
+
 #ifdef _KERNEL_MODE
 	FILE_ID_INFORMATION FileID; // 24 bytes - file id 128 bits and its volume serial number
 #else
@@ -80,9 +80,9 @@ typedef struct _DRIVER_MESSAGE {
 	BOOLEAN isEntropyCalc; // 1 byte
 	UCHAR FileChange; // 1 byte
 	UCHAR DUMMY; // 1 byte align
-	ULONGLONG fileNameSize; // 8 bytes - size of the fileName used
-	PWCHAR fileName; // 8 bytes, will be reserved on the buffer if needed
-	PVOID next; // 8 bytes - next DRIVER_MESSAGE, we use it to allow adding the fileName to the same buffer, this pointer should point to the next DRIVER_MESSAGE in buffer (kernel handled)
+	//ULONGLONG fileNameSize; // 8 bytes - size of the fileName used
+	//PWCHAR fileName; // 8 bytes, will be reserved on the buffer if needed
+	//PVOID next; // 8 bytes - next DRIVER_MESSAGE, we use it to allow adding the fileName to the same buffer, this pointer should point to the next DRIVER_MESSAGE in buffer (kernel handled)
 	
 } DRIVER_MESSAGE, *PDRIVER_MESSAGE;
 
