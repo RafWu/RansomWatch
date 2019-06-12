@@ -448,11 +448,11 @@ FSProcessPreOperartion(
 	}
 
 	// no communication
-	/*
+	
 	if (IsCommClosed()) {
 		DbgPrint("!!! FSFilter: PreOp skipped due to port closed \n");
 		return FLT_PREOP_SUCCESS_NO_CALLBACK;
-	}*/
+	}
 
 	PIRP_ENTRY newEntry = new IRP_ENTRY();
 	if (newEntry == NULL) {
@@ -483,6 +483,7 @@ FSProcessPreOperartion(
 	FilePath.MaximumLength = MAX_FILE_NAME_SIZE;
 	hr = FSAllocateUnicodeString(&FilePath);
 	if (!NT_SUCCESS(hr)) {
+		FltReleaseFileNameInformation(nameInfo);
 		delete newEntry;
 		return hr;
 	}
@@ -491,12 +492,14 @@ FSProcessPreOperartion(
 	if (!NT_SUCCESS(hr)) {
 		DbgPrint("!!! FSFilter: Failed to set file name on irp\n");
 		FSFreeUnicodeString(&FilePath);
+		FltReleaseFileNameInformation(nameInfo);
 		delete newEntry;
 		return hr;
 	}
 	if (!FSIsFileNameInScanDirs(&FilePath)) {
 		DbgPrint("!!! FSFilter: Skipping uninterented file, not in scan area \n");
 		FSFreeUnicodeString(&FilePath);
+		FltReleaseFileNameInformation(nameInfo);
 		delete newEntry;
 		return FLT_PREOP_SUCCESS_NO_CALLBACK;
 	}
@@ -513,8 +516,6 @@ FSProcessPreOperartion(
 	DbgPrint("!!! FSFilter: Logging IRP op: %s \n", FltGetIrpName(Data->Iopb->MajorFunction));
 
 	FSFreeUnicodeString(&FilePath);
-
-	FltReleaseFileNameInformation(nameInfo);
 
 	hr = FLT_PREOP_SUCCESS_NO_CALLBACK;
 	// reset
@@ -545,6 +546,7 @@ FSProcessPreOperartion(
 		DbgPrint("!!! FSFilter: Preop IRP_MJ_READ, return with postop \n");
 		// save context for post, we calculate the entropy of read, we pass the irp to application on post op
 		*CompletionContext = newEntry;
+		FltReleaseFileNameInformation(nameInfo);
 		return FLT_PREOP_SUCCESS_WITH_CALLBACK;
 	}
 	case IRP_MJ_CLEANUP:
@@ -571,6 +573,7 @@ FSProcessPreOperartion(
 			// fail the irp request
 			Data->IoStatus.Status = STATUS_INSUFFICIENT_RESOURCES;
 			Data->IoStatus.Information = 0;
+			FltReleaseFileNameInformation(nameInfo);
 			return FLT_PREOP_COMPLETE;
 		}
 		newItem->MemSizeUsed = Data->Iopb->Parameters.Write.Length;
@@ -586,6 +589,7 @@ FSProcessPreOperartion(
 			// fail the irp request
 			Data->IoStatus.Status = STATUS_INTERNAL_ERROR;
 			Data->IoStatus.Information = 0;
+			FltReleaseFileNameInformation(nameInfo);
 			return FLT_PREOP_COMPLETE;
 		}
 	}
@@ -600,29 +604,97 @@ FSProcessPreOperartion(
 			(((PFILE_DISPOSITION_INFORMATION)(Data->Iopb->Parameters.SetFileInformation.InfoBuffer))->DeleteFile))
 		{
 			newItem->FileChange = FILE_CHANGE_DELETE_FILE;
-		}
+		} // end delete 1
+
 		else if (fileInfo == FileDispositionInformationEx &&
 			FlagOn(((PFILE_DISPOSITION_INFORMATION_EX)(Data->Iopb->Parameters.SetFileInformation.InfoBuffer))->Flags, FILE_DISPOSITION_DELETE)) {
 			newItem->FileChange = FILE_CHANGE_DELETE_FILE;
-		}
-		else if (fileInfo == FileRenameInformation || fileInfo == FileRenameInformationEx) {
-			newItem->FileChange = FILE_CHANGE_RENAME_FILE;
+		} // end delete 2
+
+		else if (fileInfo == FileRenameInformation || fileInfo == FileRenameInformationEx) 
+		{
 			// OPTIONAL: get new name?
-		}
-		else {
+			// OPTIONAL: we can detect files moved in to protected area and files moved out
+
+			// new code - get extension
+			newItem->FileChange = FILE_CHANGE_RENAME_FILE;
+			PFILE_RENAME_INFORMATION renameInfo = (PFILE_RENAME_INFORMATION)Data->Iopb->Parameters.SetFileInformation.InfoBuffer;
+			PFLT_FILE_NAME_INFORMATION newNameInfo;
+			NTSTATUS status = FltGetDestinationFileNameInformation(
+				FltObjects->Instance,
+				FltObjects->FileObject,
+				renameInfo->RootDirectory,
+				renameInfo->FileName,
+				renameInfo->FileNameLength,
+				FLT_FILE_NAME_QUERY_DEFAULT | FLT_FILE_NAME_REQUEST_FROM_CURRENT_PROVIDER | FLT_FILE_NAME_OPENED,
+				&newNameInfo
+			);
+			if (!NT_SUCCESS(status)) {
+				delete newEntry;
+				FltReleaseFileNameInformation(nameInfo);
+				return FLT_PREOP_SUCCESS_NO_CALLBACK;
+			}
+
+			// parse file name info
+			status = FltParseFileNameInformation(newNameInfo);
+			if (!NT_SUCCESS(status)) {
+				delete newEntry;
+				FltReleaseFileNameInformation(nameInfo);
+				return FLT_PREOP_SUCCESS_NO_CALLBACK;
+			}
+			UNICODE_STRING NewFilePath;
+			NewFilePath.MaximumLength = MAX_FILE_NAME_SIZE;
+			status = FSAllocateUnicodeString(&NewFilePath);
+			if (!NT_SUCCESS(status)) {
+				FltReleaseFileNameInformation(newNameInfo);
+				FltReleaseFileNameInformation(nameInfo);
+				delete newEntry;
+				return FLT_PREOP_SUCCESS_NO_CALLBACK;
+			}
+
+			status = FSEntrySetFileName(FltObjects->Volume, newNameInfo, &NewFilePath);
+			if (!NT_SUCCESS(status)) {
+				DbgPrint("!!! FSFilter: Failed to set new file name on irp\n");
+				FSFreeUnicodeString(&NewFilePath);
+				FltReleaseFileNameInformation(newNameInfo);
+				FltReleaseFileNameInformation(nameInfo);
+				delete newEntry;
+				return FLT_PREOP_SUCCESS_NO_CALLBACK;
+			}
+
+			DbgPrint("!!! FSFilter: copying the file type extension, extension length: %d, name: %wZ\n", newNameInfo->Extension.Length, newNameInfo->Extension);
+			RtlZeroBytes(newItem->Extension, (FILE_OBJEC_MAX_EXTENSION_SIZE + 1) * sizeof(WCHAR));
+			for (LONG i = 0; i < FILE_OBJEC_MAX_EXTENSION_SIZE; i++) {
+				if (i == (newNameInfo->Extension.Length / 2)) break;
+				newItem->Extension[i] = newNameInfo->Extension.Buffer[i];
+			}
+			for (LONG i = 0; i < FILE_OBJEC_MAX_EXTENSION_SIZE ; i++) {
+				if (i == (nameInfo->Extension.Length / 2)) break;
+				if (newItem->Extension[i] != nameInfo->Extension.Buffer[i]) {
+					newItem->FileChange = FILE_CHANGE_EXTENSION_CHANGED;
+					break;
+				}
+			}
+			FSFreeUnicodeString(&NewFilePath);
+			FltReleaseFileNameInformation(newNameInfo);
+			// end new code
+		} // end rename
+		else 
+		{
 			delete newEntry;
+			FltReleaseFileNameInformation(nameInfo);
 			return FLT_PREOP_SUCCESS_NO_CALLBACK;
 		}
-	}
 		break;
+	}
 	default :
 		delete newEntry;
+		FltReleaseFileNameInformation(nameInfo);
 		return FLT_PREOP_SUCCESS_NO_CALLBACK;
 	}
-	//delete newEntry;
 	DbgPrint("!!! FSFilter: Addung entry to irps %s\n", FltGetIrpName(Data->Iopb->MajorFunction));
 	driverData->AddIrpMessage(newEntry);
-	
+	FltReleaseFileNameInformation(nameInfo);
 	return hr;
 }
 
@@ -689,7 +761,6 @@ FSProcessCreateIrp(
 	_In_ PCFLT_RELATED_OBJECTS FltObjects
 )
 {
-	//FIXME: add check for connection to user
 	NTSTATUS hr;
 	if (/*FlagOn(Data->Iopb->OperationFlags, SL_OPEN_TARGET_DIRECTORY) || */FlagOn(Data->Iopb->OperationFlags, SL_OPEN_PAGING_FILE)) {
 		return FLT_POSTOP_FINISHED_PROCESSING;
@@ -799,12 +870,11 @@ FSProcessPostReadIrp(
 	_In_ FLT_POST_OPERATION_FLAGS Flags
 )
 {
-	//FIXME: add check for connection to user
 	if (CompletionContext == NULL) {
 		return FLT_POSTOP_FINISHED_PROCESSING;
 	}
 
-	if (driverData->isFilterClosed() /*|| IsCommClosed()*/) {
+	if (driverData->isFilterClosed() || IsCommClosed()) {
 		DbgPrint("!!! FSFilter: Post op read, comm or filter closed\n");
 		return FLT_POSTOP_FINISHED_PROCESSING;
 	}

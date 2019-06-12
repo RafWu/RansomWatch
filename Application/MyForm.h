@@ -281,19 +281,19 @@ private: System::Void SelectRemRootDir_Click(System::Object^  sender, System::Ev
 			std::wstring path(wch);
 			DBOUT(path << std::endl);
 			String^ logHead = gcnew String("<I> Trying to remove directory: ");
-			String^ logMsg = String::Concat(logHead, selectedDir);
+			String^ logMsg = String::Concat(logHead, selectedDir, System::Environment::NewLine);
 			logViewer->AppendText(logMsg);
 
 			// do remove dir message
 			NTSTATUS hr = RemoveFilterDirectory(selectedDir);
 			if (hr == S_OK) {
 				String^ logSuccess = gcnew String("<E> Removed filter directory: ");
-				String^ logMsgSuc = String::Concat(logSuccess, selectedDir);
+				String^ logMsgSuc = String::Concat(logSuccess, selectedDir, System::Environment::NewLine);
 				logViewer->AppendText(logMsgSuc);
 			}
 			else {
 				String^ logFail = gcnew String("<E> Failed to remove directory: ");
-				String^ logMsgFail = String::Concat(logFail, selectedDir);
+				String^ logMsgFail = String::Concat(logFail, selectedDir, System::Environment::NewLine);
 				logViewer->AppendText(logMsgFail);
 			}
 
@@ -320,24 +320,27 @@ private: System::Void SelectAddRootDir_Click(System::Object^  sender, System::Ev
 			DBOUT(path << std::endl);
 
 			String^ logHead = gcnew String("<I> Trying to add directory: ");
-			String^ logMsg = String::Concat(logHead, selectedDir);
+			String^ logMsg = String::Concat(logHead, selectedDir, System::Environment::NewLine);
 			logViewer->AppendText(logMsg);
 
+			if (Globals::Instance->getCommCloseStat() || context.Port == nullptr) { // no comm
+				logViewer->AppendText(String::Concat("Comm closed", System::Environment::NewLine));
+				return;
+			}
 			// handle traps
-
 			trapHandler->initDirTraps(selectedDir);
 
 			// do add dir message
 			NTSTATUS hr = AddFilterDirectory(selectedDir);
 			if (hr == S_OK) {
 				String^ logSuccess = gcnew String("<E> Added filter directory: ");
-				String^ logMsgSuc = String::Concat(logSuccess, selectedDir);
+				String^ logMsgSuc = String::Concat(logSuccess, selectedDir, System::Environment::NewLine);
 				
 				logViewer->AppendText(logMsgSuc);
 			}
 			else {
 				String^ logFail = gcnew String("<E> Failed to add directory: ");
-				String^ logMsgFail = String::Concat(logFail, selectedDir);
+				String^ logMsgFail = String::Concat(logFail, selectedDir, System::Environment::NewLine);
 				logViewer->AppendText(logMsgFail);
 			}
 		}

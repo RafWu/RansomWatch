@@ -13,6 +13,7 @@ ref class ProcessRecord {
 	ULONG pid;
 	BOOLEAN malicious;
 	BOOLEAN killed;
+	BOOLEAN safeProcess;
 	String^ appName;
 	ULONGLONG totalReadOperations;
 	ULONGLONG totalWriteOperations;
@@ -22,48 +23,63 @@ ref class ProcessRecord {
 	ULONGLONG trapsRead;
 	ULONGLONG trapsWrite;
 	ULONGLONG trapsOpened;
-	ULONGLONG trapsRenameDelete;
+	ULONGLONG trapsRenamed;
+	ULONGLONG trapsDeleted;
 	
-	ULONGLONG dirListingCount;
-	ULONGLONG filesOpenedCount;
-	ULONGLONG filesCreatedCount;
-	ULONGLONG filesWrittenCount;
-	ULONGLONG filesReadCount;
-	ULONGLONG filesRenamedCount;
-	ULONGLONG filesMovedInCount;
-	ULONGLONG filesMovedOutCount;
-	ULONGLONG filesDeletedCount;
+	//ULONGLONG filesOpenedCount;
+	//ULONGLONG filesMovedInCount;
+	//ULONGLONG filesMovedOutCount;
 	ULONGLONG filesExtensionChanged;
 
 	Generic::HashSet<FileId>^ dirsListed;
-	Generic::HashSet<FileId>^ fileIdsOpened;
+	Generic::HashSet<FileId>^ fileIdsChecked; // accessed
+	Generic::HashSet<FileId>^ fileIdsDeleted;
 	Generic::HashSet<FileId>^ fileIdsCreate;
 	Generic::HashSet<FileId>^ fileIdsWrite;
 	Generic::HashSet<FileId>^ fileIdsRead;
 	Generic::HashSet<FileId>^ fileIdsRenamed;
-	Generic::HashSet<FileId>^ fileIdsMoveIn;
-	Generic::HashSet<FileId>^ fileIdsMoveOut;
+	Generic::HashSet<FileId>^ fileIdsTraps;
 	Generic::List<String^>^	  filesDeleted;   // paths
+	Generic::SortedSet<String^>^ dirsTrapsActions;	 // dir paths of which an action took place on a trap, write, read, rename or delete
 	Generic::SortedSet<String^>^ triggersBreached;   // triggers that were breached, we use this to report later
 
-	ULONG fileExtensionTypesWrite;
-	ULONG fileExtensionTypesRead;
 	Generic::SortedSet<String^>^ extensionsRead;
 	Generic::SortedSet<String^>^ extensionsWrite;
 
-	DOUBLE averegeReadEntropy;
-	DOUBLE averegeWriteEntropy;
+	DOUBLE sumWeightWriteEntropy;
+	DOUBLE sumWeightReadEntropy;
 	
 	ULONGLONG totalReadBytes;
 	ULONGLONG totalWriteBytes;
 
 	ULONGLONG highEntropyWrites;
 
+	public: Generic::SortedSet<String^>^ GetTriggersBreached() {
+		Generic::SortedSet<String^>^ ret = gcnew Generic::SortedSet<String^>;
+		Monitor::Enter(this);
+		ret->UnionWith(triggersBreached);
+		Monitor::Exit(this);
+		return ret;
+	}
+
+	private: DOUBLE AverageReadEntropy() {
+		if (totalReadBytes)
+			return (sumWeightReadEntropy / (DOUBLE)totalReadBytes);
+		return 0;
+	}
+
+	private: DOUBLE AverageWriteEntropy() {
+	if (totalWriteBytes)
+		return (sumWeightWriteEntropy / (DOUBLE)totalWriteBytes);
+	return 0;
+	}
+
 	public: ProcessRecord() {
 		pid = 0;
 		appName = nullptr;
 		malicious = FALSE;
 		killed = FALSE;
+		safeProcess = FALSE;
 
 		totalReadOperations = 0;
 		totalWriteOperations = 0;
@@ -73,37 +89,28 @@ ref class ProcessRecord {
 		trapsRead = 0;
 		trapsWrite = 0;
 		trapsOpened = 0;
-		trapsRenameDelete = 0;
+		trapsRenamed = 0;
+		trapsDeleted = 0;
 
-		dirListingCount = 0;
-		filesOpenedCount = 0;
-		filesCreatedCount = 0;
-		filesWrittenCount = 0;
-		filesReadCount = 0;
-		filesRenamedCount = 0;
-		filesMovedInCount = 0;
-		filesMovedOutCount = 0;
-		filesDeletedCount = 0;
 		filesExtensionChanged = 0;
 		
 		dirsListed = gcnew Generic::HashSet<FileId>;
-		fileIdsOpened = gcnew Generic::HashSet<FileId>;
+		fileIdsChecked = gcnew Generic::HashSet<FileId>;
 		fileIdsCreate = gcnew Generic::HashSet<FileId>;
 		fileIdsWrite = gcnew Generic::HashSet<FileId>;
 		fileIdsRead = gcnew Generic::HashSet<FileId>;
 		fileIdsRenamed = gcnew Generic::HashSet<FileId>;
-		fileIdsMoveIn = gcnew Generic::HashSet<FileId>;
-		fileIdsMoveOut = gcnew Generic::HashSet<FileId>;
+		fileIdsDeleted = gcnew Generic::HashSet<FileId>;
+		fileIdsTraps = gcnew Generic::HashSet<FileId>;
 		filesDeleted = gcnew Generic::List<String^>;
+		dirsTrapsActions = gcnew Generic::SortedSet<String^>;
 		triggersBreached = gcnew Generic::SortedSet<String^>;
 
-		fileExtensionTypesWrite = 0;
-		fileExtensionTypesRead = 0;
 		extensionsRead = gcnew Generic::SortedSet<String^>;
 		extensionsWrite = gcnew Generic::SortedSet<String^>;
 
-		averegeReadEntropy = 0;
-		averegeWriteEntropy = 0;
+		sumWeightWriteEntropy = 0;
+		sumWeightReadEntropy = 0;
 		//ULONGLONG highEntropyReplaces;
 
 		totalReadBytes = 0;
@@ -136,7 +143,18 @@ ref class ProcessRecord {
 			}
 			CloseHandle(h);
 		}
-
+		if (appName != nullptr) {
+			if (appName->Contains("explorer.exe")) {
+				safeProcess = TRUE;
+			}
+			else {
+				safeProcess = FALSE;
+			}
+		}
+		else {
+			safeProcess = FALSE;
+			appName = gcnew System::String("NaN");
+		}
 		malicious = FALSE;
 		killed = FALSE;
 
@@ -148,37 +166,28 @@ ref class ProcessRecord {
 		trapsRead = 0;
 		trapsWrite = 0;
 		trapsOpened = 0;
-		trapsRenameDelete = 0;
+		trapsRenamed = 0;
+		trapsDeleted = 0;
 
-		dirListingCount = 0;
-		filesOpenedCount = 0;
-		filesCreatedCount = 0;
-		filesWrittenCount = 0;
-		filesReadCount = 0;
-		filesRenamedCount = 0;
-		filesMovedInCount = 0;
-		filesMovedOutCount = 0;
-		filesDeletedCount = 0;
 		filesExtensionChanged = 0;
 
 		dirsListed = gcnew Generic::HashSet<FileId>;
-		fileIdsOpened  = gcnew Generic::HashSet<FileId>;
+		fileIdsChecked  = gcnew Generic::HashSet<FileId>;
 		fileIdsCreate = gcnew Generic::HashSet<FileId>;
 		fileIdsWrite = gcnew Generic::HashSet<FileId>;
 		fileIdsRead = gcnew Generic::HashSet<FileId>;
 		fileIdsRenamed = gcnew Generic::HashSet<FileId>;
-		fileIdsMoveIn = gcnew Generic::HashSet<FileId>;
-		fileIdsMoveOut = gcnew Generic::HashSet<FileId>;
+		fileIdsDeleted = gcnew Generic::HashSet<FileId>;
 		filesDeleted = gcnew Generic::List<String^>;
+		fileIdsTraps = gcnew Generic::HashSet<FileId>;
+		dirsTrapsActions = gcnew Generic::SortedSet<String^>;
 		triggersBreached = gcnew Generic::SortedSet<String^>;
 
-		fileExtensionTypesWrite = 0;
-		fileExtensionTypesRead = 0;
 		extensionsRead = gcnew Generic::SortedSet<String^>;
 		extensionsWrite = gcnew Generic::SortedSet<String^>;
 
-		averegeReadEntropy = 0;
-		averegeWriteEntropy = 0;
+		sumWeightWriteEntropy = 0;
+		sumWeightReadEntropy = 0;
 		//ULONGLONG highEntropyReplaces;
 
 		totalReadBytes = 0;
@@ -192,18 +201,18 @@ ref class ProcessRecord {
 		System::String^ newMsg = "Recieved an irp request: ";
 		newMsg = System::String::Concat(newMsg, Irp.IRP_OP.ToString(), " From process id: ", Irp.PID.ToString(), " AppName: ", appName, System::Environment::NewLine);
 		Globals::Instance->postLogMessage(newMsg);
-		
+
+		if (safeProcess) {
+			DBOUT("Safe process, skipping " << std::endl);
+			return TRUE;
+		}
+
 		Monitor::Enter(this);
-		// FIXME: add to fields, check file id and add to new file accordingly
-
-		//DBOUT("Recived irp: " << Irp.IRP_OP << " process pid: " << Irp.PID);
-
-		//Globals::Instance->getTextBox()->AppendText(newMsg);
 		switch (Irp.IRP_OP) 
 		{
 			case IRP_SETINFO: 
 			{
-				UpdateSetInfo(Irp.FileChange, Irp.FileID);
+				UpdateSetInfo(Irp.FileChange, Irp.FileID, Irp.Extension);
 				break;
 			}
 			case IRP_READ: 
@@ -223,12 +232,12 @@ ref class ProcessRecord {
 			}
 			case IRP_CLEANUP: 
 			{
-				DBOUT("Recived IRP_CLEANUP message: " << Irp.IRP_OP << " process pid: " << Irp.PID);
+				DBOUT("Recived IRP_CLEANUP message: " << Irp.IRP_OP << " process pid: " << Irp.PID << std::endl);
 				break;
 			}
 			default:
 			{
-				DBOUT("Recived unhandled irp message: " << Irp.IRP_OP << " process pid: " << Irp.PID);
+				DBOUT("Recived unhandled irp message: " << Irp.IRP_OP << " process pid: " << Irp.PID << std::endl);
 				Monitor::Exit(this);
 				return FALSE;
 			}
@@ -239,22 +248,40 @@ ref class ProcessRecord {
 		return TRUE;
 	}
 
-	public: void UpdateSetInfo(UCHAR fileChangeEnum, const FILE_ID_INFO& idInfo) {
+	public: void UpdateSetInfo(UCHAR fileChangeEnum, const FILE_ID_INFO& idInfo, const LPCWSTR Extension) {
 		DBOUT("Update set info for irp message\n");
 		FileId newId(idInfo);
-		if (IsFileIdTrapFIle(newId)) {
-			trapsRenameDelete++;
-		}
+
 
 		if (fileChangeEnum == FILE_CHANGE_DELETE_FILE) {
-			filesDeletedCount++;
+			fileIdsDeleted->Add(newId);
+			fileIdsChecked->Add(newId);
+			if (IsFileIdTrapFIle(newId)) {
+				trapsDeleted++;
+				dirsTrapsActions->Add(TrapsMemory::Instance->fileIdToTrapRecord[newId]->getDirectory());
+				fileIdsTraps->Add(newId);
+			}
 		}
-		else if (fileChangeEnum == FILE_CHANGE_RENAME_FILE) {
+		else if (fileChangeEnum == FILE_CHANGE_RENAME_FILE || fileChangeEnum == FILE_CHANGE_EXTENSION_CHANGED) {
 			fileIdsRenamed->Add(newId);
-			filesRenamedCount++;
+			fileIdsChecked->Add(newId);
 			totalRenameOperations++;
-		}
+			if (IsFileIdTrapFIle(newId)) {
+				trapsRenamed++;
+				fileIdsTraps->Add(newId);
+			}
+			if (fileChangeEnum == FILE_CHANGE_EXTENSION_CHANGED) {
+				filesExtensionChanged++;
+				DBOUT("Extension changed: " << Extension << std::endl);
+				if (extensionsWrite->Add(gcnew String(Extension))) {
+					DBOUT("Added extension " << Extension << std::endl);
+				}
+				else {
+					DBOUT("No extension to add " << Extension << std::endl);
+				}
+			}
 
+		}
 	}
 
 	private: void UpdateCreateInfo(UCHAR fileChangeEnum, const FILE_ID_INFO& idInfo) 
@@ -269,26 +296,28 @@ ref class ProcessRecord {
 		DBOUT("\n");*/
 		if (IsFileIdTrapFIle(newId)) {
 			trapsOpened++;
+			fileIdsTraps->Add(newId);
 		}
 		totalCreateOperations++;
 		switch (fileChangeEnum) {
 		case FILE_CHANGE_NEW_FILE:
 		{
 			//DBOUT("fileIdsCreate in\n");
-			filesCreatedCount++;
 			fileIdsCreate->Add(newId);
 			//DBOUT("fileIdsCreate out\n");
 			break;
 		}
 		case FILE_CHANGE_OVERWRITE_FILE: // file is overwritten
 		{
-			filesCreatedCount++;
 			fileIdsCreate->Add(newId);
 		}
 		case FILE_CHANGE_DELETE_FILE: //file opened but will be deleted when closed
 		{
-			filesDeletedCount++;
-			if (IsFileIdTrapFIle(newId)) trapsRenameDelete++;
+			fileIdsDeleted->Add(newId);
+			if (IsFileIdTrapFIle(newId)) {
+				trapsDeleted++;
+				dirsTrapsActions->Add(TrapsMemory::Instance->fileIdToTrapRecord[newId]->getDirectory());
+			}
 			break;
 		}
 
@@ -298,14 +327,12 @@ ref class ProcessRecord {
 		}
 		case FILE_OPEN_DIRECTORY: // directory listing
 		{
-			if (dirsListed->Add(newId)) dirListingCount++;
+			dirsListed->Add(newId);
 			break;
 		}
 		default:
 			//DBOUT("fileIdsOpened in \n");
-			if (fileIdsOpened->Add(newId)) filesOpenedCount++;
 			//DBOUT("fileIdsOpened out, size fileIdsOpened: " << filesOpenedCount << "\n");
-			
 			break;
 		}
 		DBOUT("Exit Create info for irp\n");
@@ -321,28 +348,28 @@ ref class ProcessRecord {
 		
 		if (!fileIdsWrite->Contains(newId)) {
 			fileIdsWrite->Add(newId);
-			filesWrittenCount++;
-			if (isTrap) trapsWrite++;
+			fileIdsChecked->Add(newId);
+			if (isTrap) {
+				trapsWrite++; 
+				fileIdsTraps->Add(newId);
+				dirsTrapsActions->Add(TrapsMemory::Instance->fileIdToTrapRecord[newId]->getDirectory());
+			}
 		}
 		// extensions
 		
 		if (extensionsWrite->Add(gcnew String(Extension))) {
 			DBOUT("Added extension " << Extension << std::endl);
-			//System::String^ newMsg = gcnew String(Extension);
-			//newMsg = System::String::Concat(newMsg, "IRP_MJ_WRITE added extension: ", System::Environment::NewLine);
-			//Globals::Instance->postLogMessage(newMsg);
-			fileExtensionTypesWrite++;
 		}
 		else {
 			DBOUT("No extension to add " << Extension << std::endl);
 		}
-		if (entropy > ENTROPY_THRESHOLD) {
+		if (entropy > HIGH_ENTROPY_THRESHOLD) {
 			highEntropyWrites++;
 		}
 
 		//handle entropy
-		// FIXME: need to account for sizes in bytes
-		averegeWriteEntropy = ((averegeWriteEntropy * totalWriteOperations + entropy) / (totalWriteOperations + 1));
+		sumWeightWriteEntropy = (entropy * (DOUBLE)writeSize) + sumWeightWriteEntropy;
+		//averegeWriteEntropy = ((averegeWriteEntropy * totalWriteOperations + entropy) / (totalWriteOperations + 1));
 
 		totalWriteOperations++;
 	}
@@ -356,25 +383,25 @@ ref class ProcessRecord {
 		
 		if (!fileIdsRead->Contains(newId)) {
 			fileIdsRead->Add(newId);
-			filesReadCount++;
-			if (isTrap) trapsRead++;
+			fileIdsChecked->Add(newId);
+			if (isTrap) {
+				trapsRead++;
+				fileIdsTraps->Add(newId); // TODO: remove overkill
+				dirsTrapsActions->Add(TrapsMemory::Instance->fileIdToTrapRecord[newId]->getDirectory());
+			}
 		}
 		// extensions
 		
 		if (extensionsRead->Add(gcnew String(Extension))) {
 			DBOUT("Added extension " << Extension << std::endl);
-			//System::String^ newMsg = gcnew String(Extension);
-			//newMsg = System::String::Concat(newMsg, "IRP_MJ_READ added extension: ", System::Environment::NewLine);
-			//Globals::Instance->postLogMessage(newMsg);
-			fileExtensionTypesRead++;
 		}
 		else {
 			DBOUT("No extension to add " << Extension << std::endl);
 		}
 
 		//handle entropy
-		// FIXME: account for bytes sizes
-		averegeReadEntropy = ((averegeReadEntropy * totalReadOperations + entropy) / (totalReadOperations + 1));
+		sumWeightReadEntropy = (entropy * (DOUBLE)readSize) + sumWeightReadEntropy;
+		//averegeReadEntropy = ((averegeReadEntropy * totalReadOperations + entropy) / (totalReadOperations + 1));
 
 		totalReadOperations++;
 	}
@@ -402,6 +429,11 @@ ref class ProcessRecord {
 	public: String^ Name() {
 		return appName;
 	}
+	// assumes that caller protect this call
+	public: BOOLEAN isSafe() {
+		return safeProcess;
+	}
+
 
 	public: BOOLEAN isProcessMalicious() {
 		Monitor::Enter(this);
@@ -430,7 +462,11 @@ ref class ProcessRecord {
 		if (extensionsTrigger) {
 			triggersBreached->Add("Extensions");
 		}
-		BOOLEAN writeFilesTrigger = WriteToFilesTrigger(); // compared to read files number
+		BOOLEAN extensionsChangeTrigger = ExtensionsChangedTrigger();
+		if (extensionsChangeTrigger) {
+			triggersBreached->Add("Extensions changed");
+		}
+		BOOLEAN writeFilesTrigger = WriteToFilesTrigger(); // not operational
 		if (writeFilesTrigger) {
 			triggersBreached->Add("High writes threshold");
 		}
@@ -438,10 +474,20 @@ ref class ProcessRecord {
 		if (trapsTrigger) {
 			triggersBreached->Add("Traps operations");
 		}
+		BOOLEAN readTrigger = ReadingTrigger(); // checked in other trigger but we do raise another trigger when work on traps reached certain point
+		if (readTrigger) {
+			triggersBreached->Add("Reading");
+		}
+		BOOLEAN accessTrigger = HighAccessTrigger(); // checked in other trigger but we do raise another trigger when work on traps reached certain point
+		if (accessTrigger) {
+			triggersBreached->Add("High accessing");
+		}
+
 
 		BYTE triggersReached = deleteTrigger + createTrigger + renameTrigger + listingTrigger +
-			highEntropyTrigger + extensionsTrigger + writeFilesTrigger + trapsTrigger;
-		if (triggersReached >= TRIGGERS_TRESHOLD && highEntropyWrites >= NUM_WRITES_FOR_TRIGGER) {
+			highEntropyTrigger + extensionsTrigger + writeFilesTrigger + trapsTrigger +
+			readTrigger + accessTrigger + extensionsChangeTrigger;
+		if (triggersReached >= TRIGGERS_TRESHOLD && highEntropyWrites >= NUM_WRITES_FOR_TRIGGER) { // TODO: want to remove num writes check
 			malicious = TRUE;
 			Monitor::Exit(this);
 			return TRUE;
@@ -451,33 +497,140 @@ ref class ProcessRecord {
 		return FALSE;
 	}
 
+	// check if file id is a trap file
 	private: BOOLEAN IsFileIdTrapFIle(FileId id) {
 		if (TrapsMemory::Instance->fileIdToTrapRecord->ContainsKey(id)) return TRUE;
 		return FALSE;
 	}
 
+	// deletion of files (with account to traps weight) vs number of protected files and vs number of files accessed in total
 	private: BOOLEAN DeletionTrigger() {
+		DOUBLE normDeletedFiles = 0;
+		DOUBLE normDeletedFilesVsAccessed = 0;
+		int deletedFiles = fileIdsDeleted->Count + TRAP_WEIGHT * trapsDeleted;
+		int accessedFiles = fileIdsChecked->Count;
+		ULONGLONG numOfFilesProtected = Globals::Instance->addNumOfDirsProtected(0);
+		if (numOfFilesProtected > MINIMUM_FILES_THRESHOLD && accessedFiles > 0) { // enough files to decide
+			normDeletedFiles = (DOUBLE)(deletedFiles) / (DOUBLE)(numOfFilesProtected);
+			normDeletedFilesVsAccessed = (DOUBLE)(deletedFiles) / (DOUBLE)(accessedFiles);
+		}
+		if (normDeletedFiles > FILES_DELETED_THRESHOLD || normDeletedFilesVsAccessed > DELETED_ACCESSED_THRESHOLD) return TRUE;
 		return FALSE;
 	}
+
+	// TODO: might collide with access trigger, maybe remove
 	private: BOOLEAN CreationTrigger() {
+		int createdFiles = fileIdsCreate->Count;
+		int readWriteFilesCount = fileIdsChecked->Count;
+		DOUBLE normFiles = 0;
+		if (readWriteFilesCount)
+			normFiles = (DOUBLE)(createdFiles) / (DOUBLE)(readWriteFilesCount);
+		if (normFiles > FILES_CREATED_THRESHOLD && readWriteFilesCount > MINIMUM_FILES_CREATE_THRESHOLD) return TRUE;
 		return FALSE;
 	}
+
+	// renaming of files (with account to traps weight) vs number of protected files and vs number of files accessed in total
 	private: BOOLEAN RenamingTrigger() {
+		DOUBLE normRenamedFiles = 0;
+		DOUBLE normRenamedFilesVsAccessed = 0;
+		int renamedFiles = fileIdsRenamed->Count + TRAP_WEIGHT * trapsRenamed;
+		int accessedFiles = fileIdsChecked->Count;
+		ULONGLONG numOfFilesProtected = Globals::Instance->addNumOfDirsProtected(0);
+		if (numOfFilesProtected > MINIMUM_FILES_THRESHOLD && accessedFiles > 0) { // enough files to decide
+			normRenamedFiles = (DOUBLE)(renamedFiles) / (DOUBLE)(numOfFilesProtected);
+			normRenamedFilesVsAccessed = (DOUBLE)(renamedFiles) / (DOUBLE)(accessedFiles);
+		}
+		if (normRenamedFiles > FILES_RENAMED_THRESHOLD || normRenamedFilesVsAccessed > RENAMED_ACCESSED_THRESHOLD) return TRUE;
 		return FALSE;
 	}
+
+	// listing od directories in protected area vs number of protected directories
 	private: BOOLEAN ListingTrigger() {
+		DOUBLE normListedDirs = 0;
+		int dirListed = dirsListed->Count;
+		ULONGLONG numOfSubdirsProtected = Globals::Instance->addNumOfDirsProtected(0);
+		if (numOfSubdirsProtected > MINIMUM_DIRS_THRESHOLD) // enough dirs to decide
+			normListedDirs = (DOUBLE)(dirListed) / (DOUBLE)(numOfSubdirsProtected);
+		if (normListedDirs > LISTING_THRESHOLD) return TRUE;
 		return FALSE;
 	}
+
+
 	private: BOOLEAN HighEntropyTrigger() {
+		DOUBLE averegeReadEntropy  = AverageReadEntropy();
+		DOUBLE averegeWriteEntropy = AverageWriteEntropy();
+
+		if (averegeReadEntropy > 0 && averegeWriteEntropy > 0) { // read and write been done
+			DOUBLE averageDiffEntropy = averegeWriteEntropy - averegeReadEntropy;
+			return (averageDiffEntropy > ((MAX_ENTROPY - averegeReadEntropy) / 2.0));
+		}
+		if (averegeWriteEntropy > HIGH_ENTROPY_THRESHOLD) { // only writes been done, process can get data from other processes
+			return TRUE;
+		}
 		return FALSE;
 	}
+
+	// extensions changed due to rename
+	private: BOOLEAN ExtensionsChangedTrigger() {
+		int extensionsChanged = filesExtensionChanged;
+		int accessedFiles = fileIdsChecked->Count;
+		DOUBLE normChangedExtensionsFiles = 0;
+		ULONGLONG numOfFilesProtected = Globals::Instance->addNumOfDirsProtected(0);
+		if (numOfFilesProtected > MINIMUM_FILES_THRESHOLD && accessedFiles > 0) { // enough files to decide
+			normChangedExtensionsFiles = (DOUBLE)(extensionsChanged) / (DOUBLE)(accessedFiles);
+		}
+		if (normChangedExtensionsFiles > CHANGE_EXTENSION_THRESHOLD) return TRUE;
+		return FALSE;
+	}
+
+	// check extension based on write and rename compared to read
 	private: BOOLEAN FileExtensionsTrigger() {
+		Generic::SortedSet<String^>^ extensionsUnion = gcnew Generic::SortedSet<String^>;
+		Generic::SortedSet<String^>^ extensionsIntersect = gcnew Generic::SortedSet<String^>;
+		extensionsUnion->UnionWith(extensionsWrite);
+		extensionsUnion->UnionWith(extensionsRead);
+		extensionsIntersect->UnionWith(extensionsWrite);
+		extensionsIntersect->SymmetricExceptWith(extensionsRead);
+		if (extensionsUnion->Count > 0) {
+			return (((DOUBLE)extensionsIntersect->Count / (DOUBLE)extensionsUnion->Count) > FILES_EXTENSION_THRESHOLD);
+
+		}
 		return FALSE;
 	}
+
 	private: BOOLEAN WriteToFilesTrigger() {
 		return FALSE;
 	}
+
+	
+	private: BOOLEAN HighAccessTrigger() {
+		int writeCount = fileIdsWrite->Count + TRAP_WEIGHT * trapsRead;
+		int readWriteFilesCount = fileIdsChecked->Count;
+		DOUBLE normFiles = 0;
+		if (readWriteFilesCount)
+			normFiles = (DOUBLE)(writeCount) / (DOUBLE)(readWriteFilesCount);
+		if (normFiles > ACCESS_FILES_TRESHOLDS && readWriteFilesCount > MINIMUM_FILES_ACCESS_THRESHOLD) return TRUE;
+
+		// if reached here there are not enough files written or number of files written is small
+		// TODO: we can try to check bytes write data
+		return FALSE;
+	}
+
+	// trigger when traps at least TRESHOLD num of directories been touched
+	// better action against ransomware which targets one or two type of files
 	private: BOOLEAN TrapsTrigger() {
+		if (dirsTrapsActions->Count > TRAPS_DIRS_TRIGGER_THRESHOLD) return TRUE;
+		return FALSE;
+	}
+
+	// Triggers when reading (with acount to traps weight went beyond threshold in account to number of protected files, minimum files required
+	private: BOOLEAN ReadingTrigger() {
+		DOUBLE normReadProtected = 0;
+		int readCount = fileIdsRead->Count + TRAP_WEIGHT * trapsRead;
+		ULONGLONG numOfFilesProtected = Globals::Instance->addNumOfDirsProtected(0);
+		if (numOfFilesProtected > MINIMUM_FILES_THRESHOLD) // enough files to decide
+			normReadProtected = (DOUBLE)(readCount) / (DOUBLE)(numOfFilesProtected);
+		if (normReadProtected > FILES_READ_THRESHOLD) return TRUE;
 		return FALSE;
 	}
 };

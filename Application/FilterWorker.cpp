@@ -58,9 +58,9 @@ Return Value
 		PDRIVER_MESSAGE MsgsBuffer = ReplyMsgs->data; // we handle like array , all msgs same in size, between 0 to 10 msgs
 		// FIXME: compare memory size, replySize (minus AMP_REPLY_IRPS) with numOps and size of DRIVER_MESSAGE, assert numOps <= 10, log are fail thread accordingly
 		// FIXME : assert ReplyMsgs->data points to Buffer + sizeof(AMF_REPLY_IRPS)
-		Globals::Instance->postLogMessage(String::Concat("Received num ops: ", numOps, "\r\n"));
+		Globals::Instance->postLogMessage(String::Concat("Received num ops: ", numOps, System::Environment::NewLine));
 		for (USHORT i = 0; i < numOps; i++) {
-			Globals::Instance->postLogMessage(String::Concat("Received irp: ", MsgsBuffer[i].IRP_OP, " from pid: ", MsgsBuffer[i].PID, "\r\n"));
+			Globals::Instance->postLogMessage(String::Concat("Received irp: ", MsgsBuffer[i].IRP_OP, " from pid: ", MsgsBuffer[i].PID, System::Environment::NewLine));
 			hr = ProcessIrp(MsgsBuffer[i]);
 			if (hr != S_OK) {
 				// log
@@ -79,7 +79,7 @@ Return Value
 			CheckHandleMaliciousApplication(pid, Port);
 		}
 
-		Globals::Instance->postLogMessage("... Finished handling irp requests, requesting\r\n");
+		Globals::Instance->postLogMessage(String::Concat("... Finished handling irp requests, requesting", System::Environment::NewLine));
 	}
 	delete[] Buffer;
 	return hr;
@@ -123,9 +123,9 @@ VOID HandleMaliciousApplication(ProcessRecord^ record, HANDLE comPort) {
 		String^ pidStr = pid.ToString();
 		String^ appName = record->Name();
 		
-		Globals::Instance->postLogMessage(String::Concat("Handling malicious application: ", appName, " with pid: ", pidStr, "\r\n"));
+		Globals::Instance->postLogMessage(String::Concat("Handling malicious application: ", appName, " with pid: ", pidStr, System::Environment::NewLine));
 		if (Globals::Instance->getKillStat()) {
-			Globals::Instance->postLogMessage("Attempt to kill process using application\r\n");
+			Globals::Instance->postLogMessage(String::Concat("Attempt to kill process using application", System::Environment::NewLine));
 			Monitor::Enter(record);
 			if (record->isMalicious() && !record->isKilled())
 			{
@@ -140,14 +140,14 @@ VOID HandleMaliciousApplication(ProcessRecord^ record, HANDLE comPort) {
 							record->setKilled();
 							CloseHandle(pHandle);
 							Monitor::Exit(record);
-							Globals::Instance->postLogMessage(String::Concat("Killed malicious process: ", appName, " with pid: ", pidStr, "\r\n"));
+							Globals::Instance->postLogMessage(String::Concat("Killed malicious process: ", appName, " with pid: ", pidStr, System::Environment::NewLine));
 							return;
 						}
 					}
 					CloseHandle(pHandle);
 				}
 				Monitor::Exit(record);
-				Globals::Instance->postLogMessage("Failed to kill process using application, using driver to kill\r\n");
+				Globals::Instance->postLogMessage(String::Concat("Failed to kill process using application, using driver to kill",System::Environment::NewLine));
 				COM_MESSAGE killPidMsg;
 				NTSTATUS retOp = S_OK;
 				DWORD retSize;
@@ -166,7 +166,7 @@ VOID HandleMaliciousApplication(ProcessRecord^ record, HANDLE comPort) {
 					}
 
 					if (FAILED(hr) || retOp != S_OK) {
-						Globals::Instance->postLogMessage(String::Concat("Failed to kill process using driver, pid: ", pidStr, "\r\n"));
+						Globals::Instance->postLogMessage(String::Concat("Failed to kill process using driver, pid: ", pidStr, System::Environment::NewLine));
 					}
 				}
 				else {
@@ -180,7 +180,7 @@ VOID HandleMaliciousApplication(ProcessRecord^ record, HANDLE comPort) {
 			}
 		}
 		else {
-			Globals::Instance->postLogMessage(String::Concat("Auto kill disabled, reporting process: ", appName, "with pid: ", pidStr, "\r\n"));
+			Globals::Instance->postLogMessage(String::Concat("Auto kill disabled, reporting process: ", appName, "with pid: ", pidStr, System::Environment::NewLine));
 			pin_ptr<const wchar_t> content = PtrToStringChars(appName);
 			std::wstring result(content, appName->Length);
 			std::wstring pidStrStd = std::to_wstring(pid);
@@ -192,10 +192,21 @@ VOID HandleMaliciousApplication(ProcessRecord^ record, HANDLE comPort) {
 }
 
 VOID CheckHandleMaliciousApplication(ULONG pid, HANDLE comPort) {
-	ProcessRecord^ record;
-	if (ProcessesMemory::Instance->Processes->TryGetValue(pid, record)) {
+	ProcessRecord^ record = nullptr;
+	if (ProcessesMemory::Instance->Processes->TryGetValue(pid, record) && record != nullptr) {
+		if (record->isSafe()) {
+			DBOUT("Safe process skipping malicious check" << std::endl);
+			return;
+		}
 		if (record->isProcessMalicious()) {
-			Globals::Instance->postLogMessage("Found malicious application\r\n");
+			Globals::Instance->postLogMessage(String::Concat("Found malicious application", System::Environment::NewLine));
+			Generic::SortedSet<String^>^ triggersDetected = record->GetTriggersBreached();
+			String^ msg = gcnew String("Breached triggers: ");
+			for each (String ^ trigger in triggersDetected) {
+				msg = String::Concat(msg, trigger, " ");
+			}
+			msg = String::Concat(msg, System::Environment::NewLine);
+			Globals::Instance->postLogMessage(msg);
 			HandleMaliciousApplication(record, comPort);
 		}
 	}

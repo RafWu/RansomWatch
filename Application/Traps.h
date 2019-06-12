@@ -9,14 +9,14 @@ using namespace System::Threading;
 ref struct TrapRecord {
 	FileId fileId; //we represent as string due to size changes, minimum of 128 bits in current systems
 	String^ filePath;
-	String^ fileName;
+	String^ directory;
 
 	void setFilePath(String^ newFilePath) { filePath = newFilePath; };
 	void setFileId(FileId newFileId) { fileId = newFileId; };
-	void setFileName(String^ newFileName) { fileName = newFileName; };
+	void setDirectory(String^ newDir) { directory = newDir; };
 
 	String^ getFilePath() { return filePath; };
-	String^ getFileName() { return fileName; };
+	String^ getDirectory() { return directory; };
 	FileId getFileId() { return fileId; };
 };
 

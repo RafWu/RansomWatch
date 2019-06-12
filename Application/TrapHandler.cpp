@@ -188,7 +188,7 @@ BOOLEAN TrapHandler::TrapGenerate(const fs::directory_entry& DirPath) {
 		FileId newId = getFileId(trapHandle);
 		newRec->setFileId(newId);
 		newRec->setFilePath(gcnew String((directory / tName).c_str()));
-		newRec->setFileName(gcnew String(tName.c_str()));
+		newRec->setDirectory(systemStringDirectory);
 		trapsRecords->Add(newRec);
 
 		TrapsMemory::Instance->fileIdToTrapRecord[newId] = newRec;
