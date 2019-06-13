@@ -151,6 +151,7 @@ NTSTATUS AMFNewMessage(
 		}
 		NTSTATUS hr = CopyWString(newEntry->path, message->path, MAX_FILE_NAME_LENGTH);
 		if (!NT_SUCCESS(hr)) {
+			delete newEntry;
 			return STATUS_INTERNAL_ERROR;
 		}
 		*ReturnOutputBufferLength = 1;

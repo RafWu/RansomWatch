@@ -517,6 +517,9 @@ FSProcessPreOperartion(
 
 	FSFreeUnicodeString(&FilePath);
 
+	if (Data->Iopb->MajorFunction != IRP_MJ_SET_INFORMATION)
+		FltReleaseFileNameInformation(nameInfo);
+
 	hr = FLT_PREOP_SUCCESS_NO_CALLBACK;
 	// reset
 	newItem->FileChange = FILE_CHANGE_NOT_SET;
@@ -546,7 +549,6 @@ FSProcessPreOperartion(
 		DbgPrint("!!! FSFilter: Preop IRP_MJ_READ, return with postop \n");
 		// save context for post, we calculate the entropy of read, we pass the irp to application on post op
 		*CompletionContext = newEntry;
-		FltReleaseFileNameInformation(nameInfo);
 		return FLT_PREOP_SUCCESS_WITH_CALLBACK;
 	}
 	case IRP_MJ_CLEANUP:
@@ -573,7 +575,6 @@ FSProcessPreOperartion(
 			// fail the irp request
 			Data->IoStatus.Status = STATUS_INSUFFICIENT_RESOURCES;
 			Data->IoStatus.Information = 0;
-			FltReleaseFileNameInformation(nameInfo);
 			return FLT_PREOP_COMPLETE;
 		}
 		newItem->MemSizeUsed = Data->Iopb->Parameters.Write.Length;
@@ -589,7 +590,6 @@ FSProcessPreOperartion(
 			// fail the irp request
 			Data->IoStatus.Status = STATUS_INTERNAL_ERROR;
 			Data->IoStatus.Information = 0;
-			FltReleaseFileNameInformation(nameInfo);
 			return FLT_PREOP_COMPLETE;
 		}
 	}
@@ -685,16 +685,15 @@ FSProcessPreOperartion(
 			FltReleaseFileNameInformation(nameInfo);
 			return FLT_PREOP_SUCCESS_NO_CALLBACK;
 		}
+		FltReleaseFileNameInformation(nameInfo);
 		break;
 	}
 	default :
 		delete newEntry;
-		FltReleaseFileNameInformation(nameInfo);
 		return FLT_PREOP_SUCCESS_NO_CALLBACK;
 	}
 	DbgPrint("!!! FSFilter: Addung entry to irps %s\n", FltGetIrpName(Data->Iopb->MajorFunction));
 	driverData->AddIrpMessage(newEntry);
-	FltReleaseFileNameInformation(nameInfo);
 	return hr;
 }
 
@@ -818,6 +817,7 @@ FSProcessCreateIrp(
 	hr = FSAllocateUnicodeString(&FilePath);
 	if (!NT_SUCCESS(hr)) {
 		delete newEntry;
+		FltReleaseFileNameInformation(nameInfo);
 		return FLT_POSTOP_FINISHED_PROCESSING;
 	}
 
@@ -825,15 +825,20 @@ FSProcessCreateIrp(
 	if (!NT_SUCCESS(hr)) {
 		DbgPrint("!!! FSFilter: Failed to set file name on irp\n");
 		delete newEntry;
+		FltReleaseFileNameInformation(nameInfo);
+		FSFreeUnicodeString(&FilePath);
+
 		return FLT_POSTOP_FINISHED_PROCESSING;
 	}
+	FltReleaseFileNameInformation(nameInfo);
+
 	if (!FSIsFileNameInScanDirs(&FilePath)) {
 		DbgPrint("!!! FSFilter: Skipping uninterented file, not in scan area \n");
 		delete newEntry;
+		FSFreeUnicodeString(&FilePath);
 		return FLT_POSTOP_FINISHED_PROCESSING;
 	}
-
-	FltReleaseFileNameInformation(nameInfo);
+	FSFreeUnicodeString(&FilePath);
 	
 	// reset entropy
 	newItem->FileChange = FILE_CHANGE_NOT_SET;
@@ -874,12 +879,13 @@ FSProcessPostReadIrp(
 		return FLT_POSTOP_FINISHED_PROCESSING;
 	}
 
+	PIRP_ENTRY entry = (PIRP_ENTRY)CompletionContext;
+
 	if (driverData->isFilterClosed() || IsCommClosed()) {
 		DbgPrint("!!! FSFilter: Post op read, comm or filter closed\n");
+		delete entry;
 		return FLT_POSTOP_FINISHED_PROCESSING;
 	}
-
-	PIRP_ENTRY entry = (PIRP_ENTRY)CompletionContext;
 
 	FLT_POSTOP_CALLBACK_STATUS status = FLT_POSTOP_FINISHED_PROCESSING;
 	
@@ -901,6 +907,7 @@ FSProcessPostReadIrp(
 		else {
 			Data->IoStatus.Status = STATUS_INTERNAL_ERROR;
 			Data->IoStatus.Information = 0;
+			delete entry;
 			return status;
 		}
 	}
@@ -963,7 +970,6 @@ FSProcessPostReadSafe(
 
 		}
 		status = STATUS_INSUFFICIENT_RESOURCES;
-
 	}
 	delete entry;
 	Data->IoStatus.Status = status;

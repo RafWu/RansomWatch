@@ -8,11 +8,16 @@ using namespace System::Threading;
 #include <windows.h>
 #include <minwinbase.h>
 
+// For verbose levels
+constexpr BOOLEAN VERBOSE_ONLY = FALSE;
+constexpr BOOLEAN PRIORITY_PRINT = TRUE;
+
 ref class Globals {
 private:
 	BOOLEAN isKillProcess = TRUE;
 	BOOLEAN isMonitorStopped = FALSE;
 	BOOLEAN isCommClosed = TRUE;
+	BOOLEAN verbose = FALSE;
 	ULONGLONG TotalIrpsHandled = 0;
 	ULONGLONG numOfFilesProtected = 0;
 	ULONGLONG numOfDirsProtected = 0;
@@ -31,12 +36,29 @@ public:
 	System::Windows::Forms::TextBox^ getTextBox() {
 		return logView;
 	}
+
+	BOOLEAN setVerbose(BOOLEAN newVerbose) {
+		Monitor::Enter(logView);
+		verbose = newVerbose;
+		Monitor::Exit(logView);
+		return newVerbose;
+	}
+
+	BOOLEAN Verbose() {
+		BOOLEAN ret;
+		Monitor::Enter(logView);
+		ret = verbose;
+		Monitor::Exit(logView);
+		return ret;
+	}
 	
 	/*FIXME: Might not work well*/
-	void postLogMessage(String^ message)
+	void postLogMessage(String^ message, BOOLEAN isPriority)
 	{
 		Monitor::Enter(logView);
-		logView->AppendText(message);
+		if ((isPriority == VERBOSE_ONLY && verbose == TRUE) || (isPriority == PRIORITY_PRINT)) {
+			logView->AppendText(message);
+		}
 		Monitor::Exit(logView);
 	}
 

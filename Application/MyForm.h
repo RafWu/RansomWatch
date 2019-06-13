@@ -37,6 +37,10 @@ namespace AntiRansomWareApp {
 	private: System::Windows::Forms::CheckBox^  DisableProtection;
 	private: System::Windows::Forms::Button^  SelectAddRootDir;
 	private: System::Windows::Forms::Button^  SelectRemRootDir;
+	private: System::Windows::Forms::PictureBox^ pictureBox1;
+	private: System::Windows::Forms::CheckBox^ Verbose;
+	private: System::Windows::Forms::Label^ AppNameTitle;
+
 
 	private: System::Windows::Forms::TextBox^  logViewer;
 
@@ -49,12 +53,18 @@ namespace AntiRansomWareApp {
 	private: void closeKernelDriverCom();
 	private: void openKernelCommunication();
 	private: System::Windows::Forms::Button^  Exit;
+	private: System::Windows::Forms::Button^ MinimizeButton;
 
 	public:
 		MyForm(void)
 		{
 			dragging = false;
 			InitializeComponent();
+			Reflection::Assembly^ pxAssembly = Reflection::Assembly::GetExecutingAssembly();
+			String^ pxResName = pxAssembly->GetName()->Name + ".Resource";
+			Resources::ResourceManager^ s_pxResourceManager = (gcnew Resources::ResourceManager(pxResName, pxAssembly));
+			this->pictureBox1->Image = (cli::safe_cast<Drawing::Bitmap^>(s_pxResourceManager->GetObject("icon")));
+			this->Icon = (cli::safe_cast<System::Drawing::Icon^>(s_pxResourceManager->GetObject("iconSmall")));
 			context.Port = nullptr;
 			Globals::Instance->setTextBox(logViewer);
 			//context.Completion = nullptr;
@@ -100,101 +110,129 @@ namespace AntiRansomWareApp {
 
 		void InitializeComponent(void)
 		{
+			System::ComponentModel::ComponentResourceManager^ resources = (gcnew System::ComponentModel::ComponentResourceManager(MyForm::typeid));
 			this->Exit = (gcnew System::Windows::Forms::Button());
+			this->MinimizeButton = (gcnew System::Windows::Forms::Button());
 			this->logViewer = (gcnew System::Windows::Forms::TextBox());
 			this->AutoKill = (gcnew System::Windows::Forms::CheckBox());
 			this->ViewLog = (gcnew System::Windows::Forms::CheckBox());
 			this->DisableProtection = (gcnew System::Windows::Forms::CheckBox());
 			this->SelectAddRootDir = (gcnew System::Windows::Forms::Button());
 			this->SelectRemRootDir = (gcnew System::Windows::Forms::Button());
+			this->pictureBox1 = (gcnew System::Windows::Forms::PictureBox());
+			this->Verbose = (gcnew System::Windows::Forms::CheckBox());
+			this->AppNameTitle = (gcnew System::Windows::Forms::Label());
+			(cli::safe_cast<System::ComponentModel::ISupportInitialize^>(this->pictureBox1))->BeginInit();
 			this->SuspendLayout();
-			// 
-			// Exit
-			// 
-			this->Exit->Location = System::Drawing::Point(475, 59);
+			
+			this->Exit->Location = System::Drawing::Point(499, 13);
 			this->Exit->Name = L"Exit";
-			this->Exit->Size = System::Drawing::Size(58, 23);
+			this->Exit->Size = System::Drawing::Size(34, 23);
 			this->Exit->TabIndex = 8;
 			this->Exit->Text = L"Exit";
 			this->Exit->UseVisualStyleBackColor = true;
 			this->Exit->Click += gcnew System::EventHandler(this, &MyForm::button1_Click);
-			// 
-			// logViewer
-			// 
-			this->logViewer->Location = System::Drawing::Point(12, 116);
+			
+			this->MinimizeButton->Location = System::Drawing::Point(459, 13);
+			this->MinimizeButton->Name = L"MinimizeButton";
+			this->MinimizeButton->Size = System::Drawing::Size(34, 23);
+			this->MinimizeButton->TabIndex = 8;
+			this->MinimizeButton->Text = L"Min";
+			this->MinimizeButton->UseVisualStyleBackColor = true;
+			this->MinimizeButton->Click += gcnew System::EventHandler(this, &MyForm::MinimizeButton_Click);
+			
+			this->logViewer->Location = System::Drawing::Point(13, 113);
 			this->logViewer->Multiline = true;
 			this->logViewer->Name = L"logViewer";
 			this->logViewer->ReadOnly = true;
 			this->logViewer->ScrollBars = System::Windows::Forms::ScrollBars::Vertical;
 			this->logViewer->Size = System::Drawing::Size(521, 252);
 			this->logViewer->TabIndex = 10;
-			this->logViewer->Visible = true;
-			// 
-			// AutoKill
-			// 
+
 			this->AutoKill->Appearance = System::Windows::Forms::Appearance::Button;
-			this->AutoKill->AutoSize = true;
 			this->AutoKill->Checked = true;
 			this->AutoKill->CheckState = System::Windows::Forms::CheckState::Checked;
-			this->AutoKill->Location = System::Drawing::Point(84, 59);
+			this->AutoKill->Location = System::Drawing::Point(94, 42);
 			this->AutoKill->Name = L"AutoKill";
-			this->AutoKill->Size = System::Drawing::Size(52, 23);
+			this->AutoKill->Size = System::Drawing::Size(120, 23);
 			this->AutoKill->TabIndex = 11;
-			this->AutoKill->Text = L"AutoKill";
+			this->AutoKill->Text = L"Kill Processes";
+			this->AutoKill->TextAlign = System::Drawing::ContentAlignment::MiddleCenter;
 			this->AutoKill->UseVisualStyleBackColor = true;
 			this->AutoKill->CheckedChanged += gcnew System::EventHandler(this, &MyForm::autokill_changed);
-			// 
-			// ViewLog
-			// 
+
 			this->ViewLog->Appearance = System::Windows::Forms::Appearance::Button;
-			this->ViewLog->AutoSize = true;
 			this->ViewLog->Checked = true;
 			this->ViewLog->CheckState = System::Windows::Forms::CheckState::Checked;
-			this->ViewLog->Location = System::Drawing::Point(142, 59);
+			this->ViewLog->Location = System::Drawing::Point(237, 71);
 			this->ViewLog->Name = L"ViewLog";
-			this->ViewLog->Size = System::Drawing::Size(58, 23);
+			this->ViewLog->Size = System::Drawing::Size(120, 23);
 			this->ViewLog->TabIndex = 12;
-			this->ViewLog->Text = L"ViewLog";
+			this->ViewLog->Text = L"View Log";
+			this->ViewLog->TextAlign = System::Drawing::ContentAlignment::MiddleCenter;
 			this->ViewLog->UseVisualStyleBackColor = true;
 			this->ViewLog->CheckedChanged += gcnew System::EventHandler(this, &MyForm::viewlog_changed);
-			// 
-			// DisableProtection
-			// 
+
 			this->DisableProtection->Appearance = System::Windows::Forms::Appearance::Button;
-			this->DisableProtection->AutoSize = true;
-			this->DisableProtection->Location = System::Drawing::Point(206, 59);
+			this->DisableProtection->Location = System::Drawing::Point(237, 42);
 			this->DisableProtection->Name = L"DisableProtection";
-			this->DisableProtection->Size = System::Drawing::Size(52, 23);
+			this->DisableProtection->Size = System::Drawing::Size(120, 23);
 			this->DisableProtection->TabIndex = 13;
-			this->DisableProtection->Text = L"Disable";
+			this->DisableProtection->Text = L"Disable Monitor";
+			this->DisableProtection->TextAlign = System::Drawing::ContentAlignment::MiddleCenter;
 			this->DisableProtection->UseVisualStyleBackColor = true;
 			this->DisableProtection->CheckedChanged += gcnew System::EventHandler(this, &MyForm::DisableProtection_CheckedChanged);
-			// 
-			// SelectAddRootDir
-			// 
-			this->SelectAddRootDir->Location = System::Drawing::Point(265, 59);
+
+			this->SelectAddRootDir->Location = System::Drawing::Point(380, 71);
 			this->SelectAddRootDir->Name = L"SelectAddRootDir";
-			this->SelectAddRootDir->Size = System::Drawing::Size(75, 23);
+			this->SelectAddRootDir->Size = System::Drawing::Size(120, 23);
 			this->SelectAddRootDir->TabIndex = 14;
-			this->SelectAddRootDir->Text = L"AddRootDir";
+			this->SelectAddRootDir->Text = L"Add Directory";
 			this->SelectAddRootDir->UseVisualStyleBackColor = true;
 			this->SelectAddRootDir->Click += gcnew System::EventHandler(this, &MyForm::SelectAddRootDir_Click);
-			// 
-			// SelectRemRootDir
-			// 
-			this->SelectRemRootDir->Location = System::Drawing::Point(347, 59);
+			this->SelectRemRootDir->Location = System::Drawing::Point(380, 42);
 			this->SelectRemRootDir->Name = L"SelectRemRootDir";
-			this->SelectRemRootDir->Size = System::Drawing::Size(75, 23);
+			this->SelectRemRootDir->Size = System::Drawing::Size(120, 23);
 			this->SelectRemRootDir->TabIndex = 15;
-			this->SelectRemRootDir->Text = L"RemRootDir";
+			this->SelectRemRootDir->Text = L"Remove Directory";
 			this->SelectRemRootDir->UseVisualStyleBackColor = true;
 			this->SelectRemRootDir->Click += gcnew System::EventHandler(this, &MyForm::SelectRemRootDir_Click);
-			// 
-			// MyForm
-			// 
+
+			this->pictureBox1->Location = System::Drawing::Point(13, 13);
+			this->pictureBox1->Name = L"pictureBox1";
+			this->pictureBox1->Size = System::Drawing::Size(73, 69);
+			this->pictureBox1->SizeMode = System::Windows::Forms::PictureBoxSizeMode::Zoom;
+			this->pictureBox1->TabIndex = 16;
+			this->pictureBox1->TabStop = false;
+
+			this->Verbose->Appearance = System::Windows::Forms::Appearance::Button;
+			this->Verbose->Location = System::Drawing::Point(94, 71);
+			this->Verbose->Name = L"Verbose";
+			this->Verbose->Size = System::Drawing::Size(120, 23);
+			this->Verbose->TabIndex = 17;
+			this->Verbose->Text = L"Verbose Mode";
+			this->Verbose->TextAlign = System::Drawing::ContentAlignment::MiddleCenter;
+			this->Verbose->UseVisualStyleBackColor = true;
+			this->Verbose->CheckedChanged += gcnew System::EventHandler(this, &MyForm::Verbose_CheckedChanged);
+			
+			this->AppNameTitle->Font = (gcnew System::Drawing::Font(L"Guttman Miryam", 15.75, static_cast<System::Drawing::FontStyle>((System::Drawing::FontStyle::Bold | System::Drawing::FontStyle::Italic)),
+				System::Drawing::GraphicsUnit::Point, static_cast<System::Byte>(177)));
+			this->AppNameTitle->Location = System::Drawing::Point(210, 11);
+			this->AppNameTitle->Name = L"AppNameTitle";
+			this->AppNameTitle->Size = System::Drawing::Size(170, 23);
+			this->AppNameTitle->TabIndex = 18;
+			this->AppNameTitle->Text = L"Ransom Watch";
+			this->AppNameTitle->TextAlign = System::Drawing::ContentAlignment::MiddleCenter;
+			
+			
 			this->AutoScaleDimensions = System::Drawing::SizeF(6, 13);
 			this->AutoScaleMode = System::Windows::Forms::AutoScaleMode::Font;
-			this->ClientSize = System::Drawing::Size(545, 423);
+			this->AutoSize = true;
+			this->AutoSizeMode = System::Windows::Forms::AutoSizeMode::GrowAndShrink;
+			this->ClientSize = System::Drawing::Size(545, 373);
+			this->Controls->Add(this->AppNameTitle);
+			this->Controls->Add(this->Verbose);
+			this->Controls->Add(this->pictureBox1);
 			this->Controls->Add(this->SelectRemRootDir);
 			this->Controls->Add(this->SelectAddRootDir);
 			this->Controls->Add(this->DisableProtection);
@@ -202,13 +240,16 @@ namespace AntiRansomWareApp {
 			this->Controls->Add(this->AutoKill);
 			this->Controls->Add(this->logViewer);
 			this->Controls->Add(this->Exit);
+			this->Controls->Add(this->MinimizeButton);
 			this->FormBorderStyle = System::Windows::Forms::FormBorderStyle::None;
 			this->Name = L"MyForm";
-			this->Text = L"MyForm";
+			this->Padding = System::Windows::Forms::Padding(0, 0, 0, 10);
+			this->Text = L"Ransom Watch";
 			this->Load += gcnew System::EventHandler(this, &MyForm::MyForm_Load);
 			this->MouseDown += gcnew System::Windows::Forms::MouseEventHandler(this, &MyForm::MyForm_MouseDown);
 			this->MouseMove += gcnew System::Windows::Forms::MouseEventHandler(this, &MyForm::MyForm_MouseMove);
 			this->MouseUp += gcnew System::Windows::Forms::MouseEventHandler(this, &MyForm::MyForm_MouseUp);
+			(cli::safe_cast<System::ComponentModel::ISupportInitialize^>(this->pictureBox1))->EndInit();
 			this->ResumeLayout(false);
 			this->PerformLayout();
 
@@ -220,6 +261,7 @@ namespace AntiRansomWareApp {
 	}
 	private: System::Void button1_Click(System::Object^  sender, System::EventArgs^  e) {
 		Close();
+		
 	}
 
 	private: System::Void MyForm_MouseDown(System::Object^  sender, System::Windows::Forms::MouseEventArgs^  e) {
@@ -282,19 +324,19 @@ private: System::Void SelectRemRootDir_Click(System::Object^  sender, System::Ev
 			DBOUT(path << std::endl);
 			String^ logHead = gcnew String("<I> Trying to remove directory: ");
 			String^ logMsg = String::Concat(logHead, selectedDir, System::Environment::NewLine);
-			logViewer->AppendText(logMsg);
+			Globals::Instance->postLogMessage(logMsg, PRIORITY_PRINT);
 
 			// do remove dir message
 			NTSTATUS hr = RemoveFilterDirectory(selectedDir);
 			if (hr == S_OK) {
-				String^ logSuccess = gcnew String("<E> Removed filter directory: ");
+				String^ logSuccess = gcnew String("<I> Removed filter directory: ");
 				String^ logMsgSuc = String::Concat(logSuccess, selectedDir, System::Environment::NewLine);
-				logViewer->AppendText(logMsgSuc);
+				Globals::Instance->postLogMessage(logMsgSuc, PRIORITY_PRINT);
 			}
 			else {
 				String^ logFail = gcnew String("<E> Failed to remove directory: ");
 				String^ logMsgFail = String::Concat(logFail, selectedDir, System::Environment::NewLine);
-				logViewer->AppendText(logMsgFail);
+				Globals::Instance->postLogMessage(logMsgFail, PRIORITY_PRINT);
 			}
 
 			// handle traps
@@ -321,10 +363,10 @@ private: System::Void SelectAddRootDir_Click(System::Object^  sender, System::Ev
 
 			String^ logHead = gcnew String("<I> Trying to add directory: ");
 			String^ logMsg = String::Concat(logHead, selectedDir, System::Environment::NewLine);
-			logViewer->AppendText(logMsg);
+			Globals::Instance->postLogMessage(logMsg, PRIORITY_PRINT);
 
 			if (Globals::Instance->getCommCloseStat() || context.Port == nullptr) { // no comm
-				logViewer->AppendText(String::Concat("Comm closed", System::Environment::NewLine));
+				Globals::Instance->postLogMessage(String::Concat("<E> Comm closed", System::Environment::NewLine), PRIORITY_PRINT);
 				return;
 			}
 			// handle traps
@@ -333,18 +375,31 @@ private: System::Void SelectAddRootDir_Click(System::Object^  sender, System::Ev
 			// do add dir message
 			NTSTATUS hr = AddFilterDirectory(selectedDir);
 			if (hr == S_OK) {
-				String^ logSuccess = gcnew String("<E> Added filter directory: ");
+				String^ logSuccess = gcnew String("<I> Added filter directory: ");
 				String^ logMsgSuc = String::Concat(logSuccess, selectedDir, System::Environment::NewLine);
-				
-				logViewer->AppendText(logMsgSuc);
+				Globals::Instance->postLogMessage(logMsgSuc, PRIORITY_PRINT);
 			}
 			else {
 				String^ logFail = gcnew String("<E> Failed to add directory: ");
 				String^ logMsgFail = String::Concat(logFail, selectedDir, System::Environment::NewLine);
-				logViewer->AppendText(logMsgFail);
+				Globals::Instance->postLogMessage(logMsgFail, PRIORITY_PRINT);
 			}
 		}
 	}
+}
+
+private: System::Void Verbose_CheckedChanged(System::Object^ sender, System::EventArgs^ e) {
+	if (Verbose->Checked) {
+		Globals::Instance->setVerbose(TRUE);
+	}
+	else {
+		Globals::Instance->setVerbose(FALSE);
+	}
+}
+
+private: System::Void MinimizeButton_Click(System::Object^ sender, System::EventArgs^ e) {
+	if (MyForm::WindowState != FormWindowState::Minimized) MyForm::WindowState = FormWindowState::Minimized;
+
 }
 
 };

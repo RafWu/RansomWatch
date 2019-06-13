@@ -1,7 +1,7 @@
 
 #include "ShanonEntropy.h"
 
-constexpr DOUBLE M_LOG2E = 1.44269504088896340736 ;
+constexpr DOUBLE M_LOG2E = 1.4426950408889634 ;
 
 constexpr ULONG MAX_BYTE_SIZE = 256;
 

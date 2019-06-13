@@ -200,7 +200,7 @@ ref class ProcessRecord {
 		
 		System::String^ newMsg = "Recieved an irp request: ";
 		newMsg = System::String::Concat(newMsg, Irp.IRP_OP.ToString(), " From process id: ", Irp.PID.ToString(), " AppName: ", appName, System::Environment::NewLine);
-		Globals::Instance->postLogMessage(newMsg);
+		Globals::Instance->postLogMessage(newMsg, VERBOSE_ONLY);
 
 		if (safeProcess) {
 			DBOUT("Safe process, skipping " << std::endl);

@@ -113,7 +113,7 @@ HRESULT AntiRansomWareApp::MyForm::RemoveFilterDirectory(String ^ directory)
 HRESULT AntiRansomWareApp::MyForm::AddFilterDirectory(String ^ directory)
 {
 	if (Globals::Instance->getCommCloseStat() || context.Port == nullptr) { // no comm
-		logViewer->AppendText(String::Concat("Comm closed", System::Environment::NewLine));
+		Globals::Instance->postLogMessage(String::Concat("Comm closed", System::Environment::NewLine), PRIORITY_PRINT);
 		return S_FALSE;
 	}
 	else if (directory == nullptr) {
