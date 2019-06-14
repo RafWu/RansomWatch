@@ -39,6 +39,10 @@ constexpr double CHANGE_EXTENSION_THRESHOLD		= 0.2;	// change extension out of a
 // Listing
 constexpr double LISTING_THRESHOLD				= 0.4;	// listed directories out of all subdirs in protected area
 
+// Moving
+constexpr double MOVE_IN_THRESHOLD				= 0.05;	// listed directories out of all subdirs in protected area
+constexpr double MOVE_OUT_THRESHOLD				= 0.1;	// listed directories out of all subdirs in protected area
+
 // Read
 constexpr double FILES_READ_THRESHOLD			= 0.4;	// files read out of all files in protected area
 
@@ -50,3 +54,4 @@ constexpr double RENAMED_ACCESSED_THRESHOLD		= 0.3;	// from accessed files
 constexpr int	 TRAP_WEIGHT					= 9;	// extra weight to action in case of traps
 constexpr int	 TRAPS_DIRS_TRIGGER_THRESHOLD	= 4;	// different dirs traps changed/read
 //constexpr int	 MINIMUM_TRAPS_TRIGGER_TRESHOLD = 50;		// different traps actions
+

@@ -4,6 +4,7 @@
 #include <windows.h>
 #include <minwinbase.h>
 #include <FltUser.h>
+#include  <subauth.h>
 #include "../SharedDefs/SharedDefs.h"
 #include "Globals.h"
 
@@ -15,6 +16,8 @@
    os_ << s;                   \
    OutputDebugString( os_.str().c_str() );  \
 }
+
+LPCSTR IRP_TO_STRING(UCHAR irp);
 
 typedef struct _SCANNER_THREAD_CONTEXT {
 

@@ -40,33 +40,44 @@ Return Value
 		ULONGLONG numOps = 0;
 		hr = FilterSendMessage(Port, &GetIrpMsg, sizeof(COM_MESSAGE), Buffer, BufferSize, &ReplySize);
 		if (FAILED(hr)) {
-			// log to textbox
-			//FIXME: Globals::Instance->getTextBox()->AppendText("...........Failed............");
-
+			Globals::Instance->postLogMessage(String::Concat("Failed irp request, stopping", numOps, System::Environment::NewLine), PRIORITY_PRINT);
 			Globals::Instance->setCommCloseStat(TRUE);
 			break;
 		}
 
 		if (ReplySize == 0 || ReplySize <= sizeof(AMF_REPLY_IRPS)) {
-			//log
+			Globals::Instance->postLogMessage(String::Concat("No ops to report, waiting", numOps, System::Environment::NewLine), VERBOSE_ONLY);
 			Sleep(100);
 			continue;
 		}
 		PAMF_REPLY_IRPS ReplyMsgs = (PAMF_REPLY_IRPS)Buffer;
-
+		PDRIVER_MESSAGE pMsgIrp = ReplyMsgs->data; // get first irp if any
 		numOps = ReplyMsgs->numOps();
-		PDRIVER_MESSAGE MsgsBuffer = ReplyMsgs->data; // we handle like array , all msgs same in size, between 0 to 10 msgs
+		if (numOps == 0 || pMsgIrp == nullptr) {
+			Globals::Instance->postLogMessage(String::Concat("No ops to report, waiting", numOps, System::Environment::NewLine), VERBOSE_ONLY);
+			Sleep(100);
+			continue;
+		}
 		// FIXME: compare memory size, replySize (minus AMP_REPLY_IRPS) with numOps and size of DRIVER_MESSAGE, assert numOps <= 10, log are fail thread accordingly
 		// FIXME : assert ReplyMsgs->data points to Buffer + sizeof(AMF_REPLY_IRPS)
 		Globals::Instance->postLogMessage(String::Concat("Received num ops: ", numOps, System::Environment::NewLine), VERBOSE_ONLY);
-		for (USHORT i = 0; i < numOps; i++) {
-			Globals::Instance->postLogMessage(String::Concat("Received irp: ", MsgsBuffer[i].IRP_OP, " from pid: ", MsgsBuffer[i].PID, System::Environment::NewLine), VERBOSE_ONLY);
-			hr = ProcessIrp(MsgsBuffer[i]);
+		while (pMsgIrp != nullptr) 
+		{
+			hr = ProcessIrp(*pMsgIrp);
 			if (hr != S_OK) {
-				// log
-				break;
+				Globals::Instance->postLogMessage(String::Concat("Failed to handle irp msg", System::Environment::NewLine), VERBOSE_ONLY);
 			}
-			pidsCheck.insert(MsgsBuffer[i].PID);
+			pidsCheck.insert(pMsgIrp->PID);
+			if (Globals::Instance->Verbose()) {
+				if (pMsgIrp->filePath.Length) {
+					std::wstring fileNameStr(pMsgIrp->filePath.Buffer, pMsgIrp->filePath.Length / 2);
+					Globals::Instance->postLogMessage(String::Concat("Received irp on file: ", gcnew String(fileNameStr.c_str()), System::Environment::NewLine), VERBOSE_ONLY);
+				}
+				else {
+					Globals::Instance->postLogMessage(String::Concat("Received irp with file len 0", System::Environment::NewLine), VERBOSE_ONLY);
+				}
+			}
+			pMsgIrp = (PDRIVER_MESSAGE)pMsgIrp->next;
 		}
 
 		// log 
@@ -207,7 +218,34 @@ VOID CheckHandleMaliciousApplication(ULONG pid, HANDLE comPort) {
 			}
 			msg = String::Concat(msg, System::Environment::NewLine);
 			Globals::Instance->postLogMessage(msg, PRIORITY_PRINT);
+
 			HandleMaliciousApplication(record, comPort);
+
+			Generic::SortedSet<String^>^ createdFiles = record->GetCreatedFiles();
+			Generic::SortedSet<String^>^ changedFiles = record->GetChangedFiles();
+			String^ reportFile = String::Concat("C:\Report", record->Pid().ToString(), ".log");
+			try {
+				StreamWriter^ sw = gcnew StreamWriter(reportFile);
+				sw->WriteLine("RansomWatch report file");
+				sw->Write("Files report for ransomware running from exe: ");
+				sw->WriteLine(record->Name());
+				sw->WriteLine(DateTime::Now);
+				sw->WriteLine("Changed files:");
+				for each (String ^ filePath in changedFiles) {
+					sw->WriteLine(filePath);
+				}
+				sw->WriteLine("Created files:");
+				for each (String ^ filePath in createdFiles) {
+					sw->WriteLine(filePath);
+				}
+				sw->WriteLine("End file");
+				sw->Close();
+				Globals::Instance->postLogMessage(String::Concat("Created report file for ransomware: ", reportFile, System::Environment::NewLine), PRIORITY_PRINT);
+			}
+			catch (...) {
+				Globals::Instance->postLogMessage(String::Concat("Failed to create report file", System::Environment::NewLine), PRIORITY_PRINT);
+			}
+
 		}
 	}
 }

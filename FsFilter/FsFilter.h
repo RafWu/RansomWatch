@@ -139,3 +139,21 @@ GetProcessImageName(
 	PEPROCESS eProcess,
 	PUNICODE_STRING ProcessImageName
 );
+
+NTSTATUS CopyFileIdInfo(
+	_Inout_ PFLT_CALLBACK_DATA Data, 
+	PDRIVER_MESSAGE newItem
+);
+
+NTSTATUS GetFileNameInfo(
+	_Inout_ PFLT_CALLBACK_DATA Data,
+	_In_ PCFLT_RELATED_OBJECTS FltObjects,
+	PUNICODE_STRING FilePath,
+	PFLT_FILE_NAME_INFORMATION* nameInfo,
+	PFILE_RENAME_INFORMATION renameInfo
+);
+
+VOID CopyExtension(
+	PWCHAR dest,
+	PFLT_FILE_NAME_INFORMATION nameInfo
+);

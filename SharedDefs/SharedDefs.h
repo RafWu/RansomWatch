@@ -46,9 +46,10 @@ typedef struct _COM_MESSAGE {
 	
 } COM_MESSAGE, *PCOM_MESSAGE;
 
-enum FILE_CHANGE {
+enum FILE_CHANGE_INFO {
 	FILE_CHANGE_NOT_SET, 
 	FILE_OPEN_DIRECTORY,
+	FILE_CHANGE_WRITE,
 	FILE_CHANGE_NEW_FILE, 
 	FILE_CHANGE_RENAME_FILE, 
 	FILE_CHANGE_EXTENSION_CHANGED,
@@ -57,14 +58,23 @@ enum FILE_CHANGE {
 	FILE_CHANGE_OVERWRITE_FILE
 };
 
+enum FILE_LOCATION_INFO {
+	FILE_NOT_PROTECTED, // nothing to set, not protected
+	FILE_PROTECTED, // if not read remember change in file
+	FILE_MOVED_IN, // new file to remove from protected
+	FILE_MOVED_OUT // keep filename if not already exist
+};
+
 enum IRP_MAJOR_OP { 
-	IRP_NONE, IRP_READ, 
-	IRP_WRITE, IRP_SETINFO, 
+	IRP_NONE, 
+	IRP_READ, 
+	IRP_WRITE, 
+	IRP_SETINFO, 
 	IRP_CREATE, 
 	IRP_CLEANUP 
 };
 
-// -64- bytes structure, fixed to 72 bytes
+// -64- bytes structure, fixed to 96 bytes
 typedef struct _DRIVER_MESSAGE {
 	WCHAR Extension[FILE_OBJEC_MAX_EXTENSION_SIZE + 1]; // null terminated 24 bytes
 
@@ -80,10 +90,9 @@ typedef struct _DRIVER_MESSAGE {
 	UCHAR IRP_OP;  // 1 byte
 	BOOLEAN isEntropyCalc; // 1 byte
 	UCHAR FileChange; // 1 byte
-	UCHAR DUMMY; // 1 byte align
-	//ULONGLONG fileNameSize; // 8 bytes - size of the fileName used
-	//PWCHAR fileName; // 8 bytes, will be reserved on the buffer if needed
-	//PVOID next; // 8 bytes - next DRIVER_MESSAGE, we use it to allow adding the fileName to the same buffer, this pointer should point to the next DRIVER_MESSAGE in buffer (kernel handled)
+	UCHAR FileLocationInfo; // 1 byte align
+	UNICODE_STRING filePath; // 16 bytes unicode string - filename, also contains size and max size, buffer is outside the struct
+	PVOID next; // 8 bytes - next PDRIVER_MESSAGE, we use it to allow adding the fileName to the same buffer, this pointer should point to the next PDRIVER_MESSAGE in buffer (kernel handled)
 	
 } DRIVER_MESSAGE, *PDRIVER_MESSAGE;
 

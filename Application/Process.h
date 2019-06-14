@@ -26,9 +26,8 @@ ref class ProcessRecord {
 	ULONGLONG trapsRenamed;
 	ULONGLONG trapsDeleted;
 	
-	//ULONGLONG filesOpenedCount;
-	//ULONGLONG filesMovedInCount;
-	//ULONGLONG filesMovedOutCount;
+	ULONGLONG filesMovedInCount;
+	ULONGLONG filesMovedOutCount;
 	ULONGLONG filesExtensionChanged;
 
 	Generic::HashSet<FileId>^ dirsListed;
@@ -39,7 +38,11 @@ ref class ProcessRecord {
 	Generic::HashSet<FileId>^ fileIdsRead;
 	Generic::HashSet<FileId>^ fileIdsRenamed;
 	Generic::HashSet<FileId>^ fileIdsTraps;
-	Generic::List<String^>^	  filesDeleted;   // paths
+
+	Generic::SortedSet<String^>^ filesCreated;  // paths created or moved in but not moved out before
+	Generic::SortedSet<String^>^ filesChanged;  // paths removed, moved out, written to or renamed
+
+
 	Generic::SortedSet<String^>^ dirsTrapsActions;	 // dir paths of which an action took place on a trap, write, read, rename or delete
 	Generic::SortedSet<String^>^ triggersBreached;   // triggers that were breached, we use this to report later
 
@@ -58,6 +61,21 @@ ref class ProcessRecord {
 		Generic::SortedSet<String^>^ ret = gcnew Generic::SortedSet<String^>;
 		Monitor::Enter(this);
 		ret->UnionWith(triggersBreached);
+		Monitor::Exit(this);
+		return ret;
+	}
+
+	public: Generic::SortedSet<String^>^ GetChangedFiles() {
+		Generic::SortedSet<String^>^ ret = gcnew Generic::SortedSet<String^>;
+		Monitor::Enter(this);
+		ret->UnionWith(filesChanged);
+		Monitor::Exit(this);
+		return ret;
+	}
+	public: Generic::SortedSet<String^>^ GetCreatedFiles() {
+		Generic::SortedSet<String^>^ ret = gcnew Generic::SortedSet<String^>;
+		Monitor::Enter(this);
+		ret->UnionWith(filesCreated);
 		Monitor::Exit(this);
 		return ret;
 	}
@@ -92,6 +110,8 @@ ref class ProcessRecord {
 		trapsRenamed = 0;
 		trapsDeleted = 0;
 
+		filesMovedInCount = 0;
+		filesMovedOutCount = 0;
 		filesExtensionChanged = 0;
 		
 		dirsListed = gcnew Generic::HashSet<FileId>;
@@ -102,7 +122,10 @@ ref class ProcessRecord {
 		fileIdsRenamed = gcnew Generic::HashSet<FileId>;
 		fileIdsDeleted = gcnew Generic::HashSet<FileId>;
 		fileIdsTraps = gcnew Generic::HashSet<FileId>;
-		filesDeleted = gcnew Generic::List<String^>;
+
+		filesCreated = gcnew Generic::SortedSet<String^>;
+		filesChanged = gcnew Generic::SortedSet<String^>;
+
 		dirsTrapsActions = gcnew Generic::SortedSet<String^>;
 		triggersBreached = gcnew Generic::SortedSet<String^>;
 
@@ -169,6 +192,8 @@ ref class ProcessRecord {
 		trapsRenamed = 0;
 		trapsDeleted = 0;
 
+		filesMovedInCount = 0;
+		filesMovedOutCount = 0;
 		filesExtensionChanged = 0;
 
 		dirsListed = gcnew Generic::HashSet<FileId>;
@@ -178,8 +203,11 @@ ref class ProcessRecord {
 		fileIdsRead = gcnew Generic::HashSet<FileId>;
 		fileIdsRenamed = gcnew Generic::HashSet<FileId>;
 		fileIdsDeleted = gcnew Generic::HashSet<FileId>;
-		filesDeleted = gcnew Generic::List<String^>;
 		fileIdsTraps = gcnew Generic::HashSet<FileId>;
+
+		filesCreated = gcnew Generic::SortedSet<String^>;
+		filesChanged = gcnew Generic::SortedSet<String^>;
+
 		dirsTrapsActions = gcnew Generic::SortedSet<String^>;
 		triggersBreached = gcnew Generic::SortedSet<String^>;
 
@@ -198,8 +226,8 @@ ref class ProcessRecord {
 	}
 	public: BOOLEAN AddIrpRecord(const DRIVER_MESSAGE& Irp) {
 		
-		System::String^ newMsg = "Recieved an irp request: ";
-		newMsg = System::String::Concat(newMsg, Irp.IRP_OP.ToString(), " From process id: ", Irp.PID.ToString(), " AppName: ", appName, System::Environment::NewLine);
+		System::String^ newMsg = "Recieved an irp: ";
+		newMsg = System::String::Concat(newMsg, gcnew String(IRP_TO_STRING(Irp.IRP_OP)), " From process id: ", Irp.PID.ToString(), " AppName: ", appName, System::Environment::NewLine);
 		Globals::Instance->postLogMessage(newMsg, VERBOSE_ONLY);
 
 		if (safeProcess) {
@@ -212,22 +240,22 @@ ref class ProcessRecord {
 		{
 			case IRP_SETINFO: 
 			{
-				UpdateSetInfo(Irp.FileChange, Irp.FileID, Irp.Extension);
+				UpdateSetInfo(Irp.FileChange, Irp.FileID, Irp.Extension, Irp.FileLocationInfo, Irp.filePath);
 				break;
 			}
 			case IRP_READ: 
 			{
-				UpdateReadInfo(Irp.Entropy, Irp.MemSizeUsed, Irp.Extension, Irp.FileID);
+				UpdateReadInfo(Irp.Entropy, Irp.MemSizeUsed, Irp.Extension, Irp.FileID, Irp.FileLocationInfo);
 				break;
 			}
 			case IRP_WRITE: 
 			{
-				UpdateWriteInfo(Irp.Entropy, Irp.MemSizeUsed, Irp.Extension, Irp.FileID);
+				UpdateWriteInfo(Irp.Entropy, Irp.MemSizeUsed, Irp.Extension, Irp.FileID, Irp.FileLocationInfo, Irp.filePath);
 				break;
 			}
 			case IRP_CREATE: 
 			{
-				UpdateCreateInfo(Irp.FileChange, Irp.FileID);
+				UpdateCreateInfo(Irp.FileChange, Irp.FileID, Irp.filePath);
 				break;
 			}
 			case IRP_CLEANUP: 
@@ -248,10 +276,27 @@ ref class ProcessRecord {
 		return TRUE;
 	}
 
-	public: void UpdateSetInfo(UCHAR fileChangeEnum, const FILE_ID_INFO& idInfo, const LPCWSTR Extension) {
+	public: void UpdateSetInfo(UCHAR fileChangeEnum, const FILE_ID_INFO& idInfo, const LPCWSTR Extension, UCHAR fileLocationEnum, UNICODE_STRING filePath) {
 		DBOUT("Update set info for irp message\n");
 		FileId newId(idInfo);
-
+		if (fileLocationEnum == FILE_MOVED_IN) {
+			std::wstring fileNameStr(filePath.Buffer, filePath.Length / 2);
+			String^ filePath = gcnew String(fileNameStr.c_str());
+			if (!filesChanged->Contains(filePath)) { // file might be deleted and brought back
+				DBOUT("Add file to created files: " << fileNameStr << "\n");
+				filesCreated->Add(filePath);
+			}
+			filesMovedInCount++;
+		}
+		if (fileLocationEnum == FILE_MOVED_OUT || fileChangeEnum == FILE_CHANGE_DELETE_FILE) {
+			filesMovedOutCount++;
+			std::wstring fileNameStr(filePath.Buffer, filePath.Length / 2);
+			String^ filePath = gcnew String(fileNameStr.c_str());
+			if (!filesCreated->Contains(filePath)) { // file might be created inside before moving out
+				DBOUT("Add file to changed files: " << fileNameStr << "\n");
+				filesChanged->Add(filePath);
+			}
+		}
 
 		if (fileChangeEnum == FILE_CHANGE_DELETE_FILE) {
 			fileIdsDeleted->Add(newId);
@@ -263,6 +308,12 @@ ref class ProcessRecord {
 			}
 		}
 		else if (fileChangeEnum == FILE_CHANGE_RENAME_FILE || fileChangeEnum == FILE_CHANGE_EXTENSION_CHANGED) {
+			std::wstring fileNameStr(filePath.Buffer, filePath.Length / 2);
+			String^ filePath = gcnew String(fileNameStr.c_str());
+			if (!filesCreated->Contains(filePath)) { // if the was already deleted or created by the app, or moved in we report as only rename
+				DBOUT("Add file to changed files: " << fileNameStr << "\n");
+				filesChanged->Add(filePath);
+			}
 			fileIdsRenamed->Add(newId);
 			fileIdsChecked->Add(newId);
 			totalRenameOperations++;
@@ -284,16 +335,10 @@ ref class ProcessRecord {
 		}
 	}
 
-	private: void UpdateCreateInfo(UCHAR fileChangeEnum, const FILE_ID_INFO& idInfo) 
+	private: void UpdateCreateInfo(UCHAR fileChangeEnum, const FILE_ID_INFO& idInfo, UNICODE_STRING filePath)
 	{
 		DBOUT("Update create info for irp message " << fileChangeEnum << "\n");
 		FileId newId(idInfo);
-		/*DBOUT("File id: ");
-		for (ULONG i = 0; i < FILE_OBJECT_ID_SIZE ; i++)
-		{
-			DBOUT(newId.fileId[i] << " ");
-		}
-		DBOUT("\n");*/
 		if (IsFileIdTrapFIle(newId)) {
 			trapsOpened++;
 			fileIdsTraps->Add(newId);
@@ -305,10 +350,17 @@ ref class ProcessRecord {
 			//DBOUT("fileIdsCreate in\n");
 			fileIdsCreate->Add(newId);
 			//DBOUT("fileIdsCreate out\n");
+			std::wstring fileNameStr(filePath.Buffer, filePath.Length / 2);
+			String^ filePath = gcnew String(fileNameStr.c_str());
+			if (!filesChanged->Contains(filePath)) {
+				DBOUT("Add file to changed files: " << fileNameStr << "\n");
+				filesCreated->Add(filePath);
+			}
 			break;
 		}
 		case FILE_CHANGE_OVERWRITE_FILE: // file is overwritten
 		{
+
 			fileIdsCreate->Add(newId);
 		}
 		case FILE_CHANGE_DELETE_FILE: //file opened but will be deleted when closed
@@ -317,6 +369,12 @@ ref class ProcessRecord {
 			if (IsFileIdTrapFIle(newId)) {
 				trapsDeleted++;
 				dirsTrapsActions->Add(TrapsMemory::Instance->fileIdToTrapRecord[newId]->getDirectory());
+			}
+			std::wstring fileNameStr(filePath.Buffer, filePath.Length / 2);
+			String^ filePath = gcnew String(fileNameStr.c_str());
+			if (!filesCreated->Contains(filePath)) {
+				DBOUT("Add file to changed files: " << fileNameStr << "\n");
+				filesChanged->Add(filePath);
 			}
 			break;
 		}
@@ -331,28 +389,32 @@ ref class ProcessRecord {
 			break;
 		}
 		default:
-			//DBOUT("fileIdsOpened in \n");
-			//DBOUT("fileIdsOpened out, size fileIdsOpened: " << filesOpenedCount << "\n");
 			break;
 		}
 		DBOUT("Exit Create info for irp\n");
 
 	}
 
-	private: void UpdateWriteInfo(DOUBLE entropy, ULONGLONG writeSize, const LPCWSTR Extension, const FILE_ID_INFO& idInfo)
+	private: void UpdateWriteInfo(DOUBLE entropy, ULONGLONG writeSize, const LPCWSTR Extension, const FILE_ID_INFO& idInfo, UCHAR fileLocationEnum, UNICODE_STRING filePath)
 	{
 		DBOUT("Update write info for irp message\n");
 		FileId newId(idInfo);
 		BOOLEAN isTrap = IsFileIdTrapFIle(newId);
 		totalWriteBytes += writeSize;
 		
-		if (!fileIdsWrite->Contains(newId)) {
+		if (fileLocationEnum == FILE_PROTECTED && !fileIdsWrite->Contains(newId)) {
 			fileIdsWrite->Add(newId);
 			fileIdsChecked->Add(newId);
 			if (isTrap) {
 				trapsWrite++; 
 				fileIdsTraps->Add(newId);
 				dirsTrapsActions->Add(TrapsMemory::Instance->fileIdToTrapRecord[newId]->getDirectory());
+			}
+			std::wstring fileNameStr(filePath.Buffer, filePath.Length / 2);
+			String^ filePath = gcnew String(fileNameStr.c_str());
+			if (!filesCreated->Contains(filePath)) {
+				DBOUT("Add file to changed files: " << fileNameStr << "\n");
+				filesChanged->Add(filePath);
 			}
 		}
 		// extensions
@@ -374,14 +436,14 @@ ref class ProcessRecord {
 		totalWriteOperations++;
 	}
 
-	private: void UpdateReadInfo(DOUBLE entropy, ULONGLONG readSize, const LPCWSTR Extension, const FILE_ID_INFO& idInfo)
+	private: void UpdateReadInfo(DOUBLE entropy, ULONGLONG readSize, const LPCWSTR Extension, const FILE_ID_INFO& idInfo, UCHAR fileLocationEnum)
 	{
 		DBOUT("Update read info for irp message\n");
 		FileId newId(idInfo);
 		BOOLEAN isTrap = IsFileIdTrapFIle(newId);
 		totalReadBytes += readSize;
 		
-		if (!fileIdsRead->Contains(newId)) {
+		if (fileLocationEnum == FILE_PROTECTED && !fileIdsRead->Contains(newId)) {
 			fileIdsRead->Add(newId);
 			fileIdsChecked->Add(newId);
 			if (isTrap) {
@@ -482,11 +544,15 @@ ref class ProcessRecord {
 		if (accessTrigger) {
 			triggersBreached->Add("High accessing");
 		}
+		BOOLEAN moveTrigger = FilesMovedTrigger(); // checked in other trigger but we do raise another trigger when work on traps reached certain point
+		if (moveTrigger) {
+			triggersBreached->Add("Moving files");
+		}
 
 
 		BYTE triggersReached = deleteTrigger + createTrigger + renameTrigger + listingTrigger +
 			highEntropyTrigger + extensionsTrigger + writeFilesTrigger + trapsTrigger +
-			readTrigger + accessTrigger + extensionsChangeTrigger;
+			readTrigger + accessTrigger + extensionsChangeTrigger + moveTrigger;
 		if (triggersReached >= TRIGGERS_TRESHOLD && highEntropyWrites >= NUM_WRITES_FOR_TRIGGER) { // TODO: want to remove num writes check
 			malicious = TRUE;
 			Monitor::Exit(this);
@@ -595,6 +661,18 @@ ref class ProcessRecord {
 			return (((DOUBLE)extensionsIntersect->Count / (DOUBLE)extensionsUnion->Count) > FILES_EXTENSION_THRESHOLD);
 
 		}
+		return FALSE;
+	}
+
+	// compare files moved inside protected area to files deleted and files moved out
+	private: BOOLEAN FilesMovedTrigger() {
+		if (fileIdsDeleted->Count + filesMovedOutCount > filesMovedInCount) {
+			return (((DOUBLE(filesMovedInCount)) / (DOUBLE(fileIdsDeleted->Count + filesMovedOutCount))) > MOVE_IN_THRESHOLD);
+		}
+		else if (filesMovedInCount > fileIdsDeleted->Count + filesMovedOutCount) {
+			return (((DOUBLE(fileIdsDeleted->Count + filesMovedOutCount)) / (DOUBLE(filesMovedInCount))) > MOVE_OUT_THRESHOLD);
+		}
+
 		return FALSE;
 	}
 

@@ -2,6 +2,7 @@
 
 #include <fltKernel.h>
 #include "KernelCommon.h"
+#include "KernelString.h"
 
 class DriverData
 {
@@ -88,44 +89,87 @@ public:
 		return (PIRP_ENTRY)CONTAINING_RECORD(ret, IRP_ENTRY, entry);
 	}
 
-
-	NTSTATUS DriverGetIrps(PVOID Buffer, ULONG BufferSize, PULONG ReturnOutputBufferLength) {
+	// FIXME
+	VOID DriverGetIrps(PVOID Buffer, ULONG BufferSize, PULONG ReturnOutputBufferLength) {
 		*ReturnOutputBufferLength = sizeof(AMF_REPLY_IRPS);
+		
 		PUCHAR OutputBuffer = (PUCHAR)Buffer;
-		ULONG SizeBuffRemain = BufferSize - sizeof(AMF_REPLY_IRPS);
-		ULONG BufferByteIndex = sizeof(AMF_REPLY_IRPS);
+		OutputBuffer += sizeof(AMF_REPLY_IRPS);
+
+		ULONG BufferSizeRemain = BufferSize - sizeof(AMF_REPLY_IRPS);
+		
 		AMF_REPLY_IRPS outHeader;
 		PLIST_ENTRY irpEntryList;
-		NTSTATUS hr = STATUS_SUCCESS;
+
+		PIRP_ENTRY PrevEntry = nullptr;
+		PDRIVER_MESSAGE Prev = nullptr;
+		UNICODE_STRING  PrevFilePath;
+		PrevFilePath.Length = 0;
+		PrevFilePath.MaximumLength = 0;
+		PrevFilePath.Buffer = nullptr;
 		
 		KIRQL irql = KeGetCurrentIrql();
 		KeAcquireSpinLock(&irpOpsLock, &irql);
 
-		while (irpOpsSize && SizeBuffRemain >= sizeof(DRIVER_MESSAGE)) {
+		while (irpOpsSize) {
 			irpEntryList = RemoveHeadList(&irpOps);
 			irpOpsSize--;
 			PIRP_ENTRY irp = (PIRP_ENTRY)CONTAINING_RECORD(irpEntryList, IRP_ENTRY, entry);
-			RtlCopyMemory(OutputBuffer + BufferByteIndex, &(irp->data), sizeof(DRIVER_MESSAGE));
-			delete irp;
-			BufferByteIndex += sizeof(DRIVER_MESSAGE);
-			SizeBuffRemain -= sizeof(DRIVER_MESSAGE);
+			UNICODE_STRING FilePath = irp->filePath;
+			PDRIVER_MESSAGE irpMsg = &(irp->data);
+			irpMsg->next = nullptr;
+			if (FilePath.Length && FilePath.Buffer) {
+				irpMsg->filePath.Length = FilePath.Length;
+				irpMsg->filePath.MaximumLength = FilePath.Length;
+				irpMsg->filePath.Buffer = nullptr;
+			}
+
+			if (sizeof(DRIVER_MESSAGE) + FilePath.Length >= BufferSizeRemain) { // return to irps list, not enough space
+				InsertHeadList(&irpOps, irpEntryList);
+				irpOpsSize++;
+				break;
+			} else {
+				if (Prev != nullptr) {
+					Prev->next = PDRIVER_MESSAGE(OutputBuffer + sizeof(DRIVER_MESSAGE) + PrevFilePath.Length); // PrevFilePath might be 0 size
+					Prev->filePath.Buffer = PWCH(OutputBuffer + sizeof(DRIVER_MESSAGE)); // filePath buffer is after irp
+					RtlCopyMemory(OutputBuffer, Prev, sizeof(DRIVER_MESSAGE)); // copy previous irp
+					if (PrevFilePath.Length && PrevFilePath.Buffer != nullptr)
+						RtlCopyMemory(OutputBuffer + sizeof(DRIVER_MESSAGE), PrevFilePath.Buffer, PrevFilePath.Length); // copy previous filePath
+					OutputBuffer += PrevFilePath.Length + sizeof(DRIVER_MESSAGE);
+					outHeader.addSize(sizeof(DRIVER_MESSAGE) + PrevFilePath.Length);
+					*ReturnOutputBufferLength += sizeof(DRIVER_MESSAGE) + PrevFilePath.Length;
+					FSFreeUnicodeString(&PrevFilePath);
+					delete PrevEntry;
+				}
+			}
+
+			PrevEntry = irp;
+			Prev = irpMsg;
+			PrevFilePath = FilePath;
+			BufferSizeRemain -= (sizeof(DRIVER_MESSAGE) + PrevFilePath.Length);
+
 			outHeader.addOp();
-			outHeader.addSize(sizeof(DRIVER_MESSAGE));
-			*ReturnOutputBufferLength += sizeof(DRIVER_MESSAGE);
-
-
+			
 		}
-
 		KeReleaseSpinLock(&irpOpsLock, irql);
 
+		if (Prev != nullptr && PrevEntry != nullptr) {
+			Prev->filePath.Buffer = PWCH(OutputBuffer + sizeof(DRIVER_MESSAGE)); // filePath buffer is after irp
+			RtlCopyMemory(OutputBuffer, Prev, sizeof(DRIVER_MESSAGE)); // copy previous irp
+			if (PrevFilePath.Length)
+				RtlCopyMemory(OutputBuffer + sizeof(DRIVER_MESSAGE), PrevFilePath.Buffer, PrevFilePath.Length); // copy previous filePath
+			OutputBuffer += PrevFilePath.Length + sizeof(DRIVER_MESSAGE);
+			outHeader.addSize(sizeof(DRIVER_MESSAGE) + PrevFilePath.Length);
+			*ReturnOutputBufferLength += sizeof(DRIVER_MESSAGE) + PrevFilePath.Length;
+			FSFreeUnicodeString(&PrevFilePath);
+			delete PrevEntry;
+		}
+
 		if (outHeader.numOps()) {
-			outHeader.data = PDRIVER_MESSAGE(OutputBuffer + sizeof(AMF_REPLY_IRPS));
+			outHeader.data = PDRIVER_MESSAGE((PUCHAR)Buffer + sizeof(AMF_REPLY_IRPS));
 		}
 		
-		RtlCopyMemory(OutputBuffer, &(outHeader), sizeof(AMF_REPLY_IRPS));
-		
-		
-		return hr;
+		RtlCopyMemory((PUCHAR)Buffer, &(outHeader), sizeof(AMF_REPLY_IRPS));
 	}
 
 	LIST_ENTRY GetAllEntries()
@@ -267,6 +311,7 @@ public:
 		while (pEntryIrps != &irpOps) {
 			LIST_ENTRY temp = *pEntryIrps;
 			PIRP_ENTRY pStrct = (PIRP_ENTRY)CONTAINING_RECORD(pEntryIrps, IRP_ENTRY, entry);
+			FSFreeUnicodeString(&(pStrct->filePath));
 			delete pStrct;
 			//next
 			pEntryIrps = temp.Flink;

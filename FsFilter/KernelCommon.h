@@ -12,6 +12,7 @@ typedef struct _DIRECTORY_ENTRY {
 typedef struct _IRP_ENTRY {
 	LIST_ENTRY entry;
 	DRIVER_MESSAGE data;
+	UNICODE_STRING filePath; // keep path to unicode string related to the object, we copy it later to user
 
 } IRP_ENTRY, *PIRP_ENTRY;
 

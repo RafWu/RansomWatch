@@ -156,20 +156,12 @@ NTSTATUS AMFNewMessage(
 		}
 		*ReturnOutputBufferLength = 1;
 		if (driverData->AddDirectoryEntry(newEntry)) {
-			/*if (OutputBuffer != NULL && OutputBufferLength > 0) {
-				swprintf_s((WCHAR*)OutputBuffer, (size_t)OutputBufferLength, L"Added scan directory \"%ls\"", message->path);
-				*ReturnOutputBufferLength = (ULONG)wcsnlen_s((WCHAR*)OutputBuffer, static_cast<size_t>(OutputBufferLength)) + 1;
-			}*/
 			*((PBOOLEAN)OutputBuffer) = TRUE;
 			DbgPrint("Added scan directory successfully\n");
 			return STATUS_SUCCESS;
 		}
 		else {
 			delete newEntry;
-			/*if (OutputBuffer != NULL && OutputBufferLength > 0) {
-				swprintf_s((WCHAR*)OutputBuffer, (size_t)OutputBufferLength, L"Failed to add directory \"%ls\"", message->path);
-				*ReturnOutputBufferLength = (ULONG)wcsnlen_s((WCHAR*)OutputBuffer, static_cast<size_t>(OutputBufferLength)) + 1;
-			}*/
 			*((PBOOLEAN)OutputBuffer) = FALSE;
 			DbgPrint("Failed to addscan directory\n");
 			return STATUS_SUCCESS;
@@ -180,20 +172,12 @@ NTSTATUS AMFNewMessage(
 		PDIRECTORY_ENTRY ptr = driverData->RemDirectoryEntry(message->path);
 		*ReturnOutputBufferLength = 1;
 		if (ptr == NULL) {
-			/*if (OutputBuffer != NULL && OutputBufferLength > 0) {
-				swprintf_s((WCHAR*)OutputBuffer, (size_t)OutputBufferLength, L"Failed to remove directory \"%ls\"", message->path);
-				*ReturnOutputBufferLength = (ULONG)wcsnlen_s((WCHAR*)OutputBuffer, static_cast<size_t>(OutputBufferLength)) + 1;
-			}*/
 			*((PBOOLEAN)OutputBuffer) = FALSE;
 			DbgPrint("Failed to remove directory\n");
 			return STATUS_SUCCESS;
 		}
 		else {
 			delete ptr;
-			/*(if (OutputBuffer != NULL && OutputBufferLength > 0) {
-				swprintf_s((WCHAR*)OutputBuffer, (size_t)OutputBufferLength, L"Removed directory \"%ls\"", message->path);
-				*ReturnOutputBufferLength = (ULONG)wcsnlen_s((WCHAR*)OutputBuffer, static_cast<size_t>(OutputBufferLength)) + 1;
-			}*/
 		}
 		*((PBOOLEAN)OutputBuffer) = TRUE;
 		DbgPrint("Removed scan directory successfully\n");
@@ -203,7 +187,8 @@ NTSTATUS AMFNewMessage(
 		if (OutputBuffer == NULL || OutputBufferLength != MAX_COMM_BUFFER_SIZE) {
 			return STATUS_INVALID_PARAMETER;
 		}
-		return driverData->DriverGetIrps(OutputBuffer, OutputBufferLength, ReturnOutputBufferLength);
+		driverData->DriverGetIrps(OutputBuffer, OutputBufferLength, ReturnOutputBufferLength);
+		return STATUS_SUCCESS;
 
 	}
 	else if (message->type == MESSAGE_SET_PID) {
@@ -245,6 +230,7 @@ NTSTATUS AMFNewMessage(
 				&clientId);
 		if (!NT_SUCCESS(status)) {
 			*((PLONG)OutputBuffer) = status; // fail
+			DbgPrint("!!! FS : Failed to open process %d, reason: %d\n", PID, status);
 			return STATUS_SUCCESS; // we dont fail code we notify back a failure
 		}
 		
@@ -254,8 +240,9 @@ NTSTATUS AMFNewMessage(
 			status = NtClose(processHandle);
 			return status; // we dont fail code we notify back a failure
 		}
-		DbgPrint("Failed to kill a process\n");
+		DbgPrint("!!! FS : Failed to kill process %d, reason: %d\n", PID, status);
 		*((PLONG)OutputBuffer) = status; // fail to kill process
+		NtClose(processHandle);
 		return STATUS_SUCCESS;
 	}
 
