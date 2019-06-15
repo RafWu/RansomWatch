@@ -19,7 +19,7 @@ typedef struct _IRP_ENTRY {
 		filePath.Length = 0;
 		filePath.MaximumLength = MAX_FILE_NAME_SIZE;
 		filePath.Buffer = Buffer;
-		RtlZeroBytes(Buffer, MAX_FILE_NAME_LENGTH);
+		RtlZeroBytes(Buffer, MAX_FILE_NAME_SIZE);
 		data.next = nullptr;
 		data.IRP_OP = IRP_NONE;
 		data.MemSizeUsed = 0;

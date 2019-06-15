@@ -421,20 +421,24 @@ FSProcessPreOperartion(
 	_Flt_CompletionContext_Outptr_ PVOID *CompletionContext
 ) 
 {
-
+	// no communication
+	if (driverData->isFilterClosed() || IsCommClosed()) {
+		DbgPrint("!!! FSFilter: Filter is closed or Port is closed, skipping data\n");
+		return FLT_PREOP_SUCCESS_NO_CALLBACK;
+	}
 	NTSTATUS hr = FLT_PREOP_SUCCESS_NO_CALLBACK;
+
+	PFLT_FILE_NAME_INFORMATION nameInfo;
+	hr = FltGetFileNameInformation(Data, FLT_FILE_NAME_OPENED | FLT_FILE_NAME_QUERY_ALWAYS_ALLOW_CACHE_LOOKUP, &nameInfo);
+	if (!NT_SUCCESS(hr))
+		return hr;
+
 	BOOLEAN isDir;
 	hr = FltIsDirectory(Data->Iopb->TargetFileObject, Data->Iopb->TargetInstance, &isDir);
 	if (!NT_SUCCESS(hr))
 		return hr;
 	if (isDir)
 		return FLT_PREOP_SUCCESS_NO_CALLBACK;
-	
-	// no communication
-	if (driverData->isFilterClosed() || IsCommClosed()) {
-		DbgPrint("!!! FSFilter: Filter is closed or Port is closed, skipping data\n");
-		return FLT_PREOP_SUCCESS_NO_CALLBACK;
-	}
 
 	PIRP_ENTRY newEntry = new IRP_ENTRY();
 	if (newEntry == NULL) {
@@ -444,18 +448,18 @@ FSProcessPreOperartion(
 	PDRIVER_MESSAGE newItem = &newEntry->data;
 	PUNICODE_STRING FilePath = &(newEntry->filePath);
 
+
+	hr = GetFileNameInfo(FltObjects, FilePath, nameInfo);
+	if (!NT_SUCCESS(hr)) {
+		delete newEntry;
+		return hr;
+	}
+	
 	//get pid
 	newItem->PID = FltGetRequestorProcessId(Data);
 
 	// get file id
 	hr = CopyFileIdInfo(Data, newItem);
-	if (!NT_SUCCESS(hr)) {
-		delete newEntry;
-		return hr;
-	}
-
-	PFLT_FILE_NAME_INFORMATION nameInfo;
-	hr = GetFileNameInfo(Data, FltObjects, FilePath, &nameInfo, nullptr);
 	if (!NT_SUCCESS(hr)) {
 		delete newEntry;
 		return hr;
@@ -587,10 +591,25 @@ FSProcessPreOperartion(
 			NewFilePath.Length = 0;
 			NewFilePath.MaximumLength = MAX_FILE_NAME_SIZE;
 			
-			NTSTATUS status = GetFileNameInfo(Data, FltObjects, &NewFilePath, &newNameInfo, renameInfo);
+			hr = FltGetDestinationFileNameInformation(
+				FltObjects->Instance,
+				FltObjects->FileObject,
+				renameInfo->RootDirectory,
+				renameInfo->FileName,
+				renameInfo->FileNameLength,
+				FLT_FILE_NAME_QUERY_DEFAULT | FLT_FILE_NAME_REQUEST_FROM_CURRENT_PROVIDER | FLT_FILE_NAME_OPENED,
+				&newNameInfo);
+			if (!NT_SUCCESS(hr)) {
+				delete newEntry;
+				FltReleaseFileNameInformation(nameInfo);
+				return hr;
+			}
+
+			NTSTATUS status = GetFileNameInfo(FltObjects, &NewFilePath, newNameInfo);
 			if (!NT_SUCCESS(status)) {
 				delete newEntry;
 				FltReleaseFileNameInformation(nameInfo);
+				FltReleaseFileNameInformation(newNameInfo);
 				return FLT_PREOP_SUCCESS_NO_CALLBACK;
 			}
 
@@ -598,7 +617,7 @@ FSProcessPreOperartion(
 				if (newItem->FileLocationInfo == FILE_NOT_PROTECTED) { // moved in - report new file name
 					newItem->FileLocationInfo = FILE_MOVED_IN;
 					//newEntry->filePath = NewFilePath; // remember file moved in
-					RtlCopyBytes(newEntry->filePath.Buffer, Buffer, MAX_FILE_NAME_SIZE); // replace buffer data with new file
+					RtlCopyBytes(newEntry->Buffer, Buffer, MAX_FILE_NAME_SIZE); // replace buffer data with new file
 				} // else we still report old file name so we know it was changed
 			}
 			else { // new file name not protected
@@ -706,18 +725,25 @@ FSProcessCreateIrp(
 		return FLT_POSTOP_FINISHED_PROCESSING;
 	}
 
-	BOOLEAN isDir;
-	hr = FltIsDirectory(Data->Iopb->TargetFileObject, Data->Iopb->TargetInstance, &isDir);
-	if (!NT_SUCCESS(hr)) {
-		return FLT_POSTOP_FINISHED_PROCESSING;
-	}
 	if (driverData->isFilterClosed() || IsCommClosed())
 	{
 		DbgPrint("!!! FSFilter: filter closed or comm closed, skip irp\n");
 		return FLT_POSTOP_FINISHED_PROCESSING;
 	}
 
+	BOOLEAN isDir;
+	hr = FltIsDirectory(Data->Iopb->TargetFileObject, Data->Iopb->TargetInstance, &isDir);
+	if (!NT_SUCCESS(hr)) {
+		return FLT_POSTOP_FINISHED_PROCESSING;
+	}
+
 	PFLT_FILE_NAME_INFORMATION nameInfo;
+	hr = FltGetFileNameInformation(Data, FLT_FILE_NAME_OPENED | FLT_FILE_NAME_QUERY_ALWAYS_ALLOW_CACHE_LOOKUP, &nameInfo);
+	if (!NT_SUCCESS(hr))
+	{
+		return FLT_POSTOP_FINISHED_PROCESSING;
+	}
+
 	PIRP_ENTRY newEntry = new IRP_ENTRY();
 	if (newEntry == NULL) {
 		return FLT_POSTOP_FINISHED_PROCESSING;
@@ -736,7 +762,7 @@ FSProcessCreateIrp(
 		return FLT_POSTOP_FINISHED_PROCESSING;
 	}
 
-	hr = GetFileNameInfo(Data, FltObjects, FilePath, &nameInfo, nullptr);
+	hr = GetFileNameInfo(FltObjects, FilePath, nameInfo);
 	if (!NT_SUCCESS(hr)) {
 		delete newEntry;
 		return FLT_POSTOP_FINISHED_PROCESSING;
@@ -913,10 +939,10 @@ FSEntrySetFileName(
 	USHORT volumeNameSize = nameInfo->Volume.Length; // in bytes
 	USHORT origNameSize = nameInfo->Name.Length; // in bytes
 	
-	WCHAR newTemp[MAX_FILE_NAME_LENGTH];
+	WCHAR newTemp[40];
 
 	UNICODE_STRING volumeData;
-	volumeData.MaximumLength = MAX_FILE_NAME_SIZE;
+	volumeData.MaximumLength = 80;
 	volumeData.Buffer = newTemp;
 	volumeData.Length = 0;
 	
@@ -929,7 +955,7 @@ FSEntrySetFileName(
 		ObDereferenceObject(devObject);
 		return hr;
 	}
-	ASSERT(newTemp == volumeData.Buffer);
+	//ASSERT(newTemp == volumeData.Buffer);
 
 	volumeDosNameSize = volumeData.Length;
 	finalNameSize = origNameSize - volumeNameSize + volumeDosNameSize; // not null terminated, in bytes
@@ -956,6 +982,8 @@ FSEntrySetFileName(
 		uString->Length = (finalNameSize > MAX_FILE_NAME_SIZE) ? MAX_FILE_NAME_SIZE : finalNameSize;
 		//DbgPrint("File name: %wZ\n", uString);	
 	}
+	if (volumeData.Buffer)
+		ExFreePool(volumeData.Buffer);
 	ObDereferenceObject(devObject);
 	return hr;
 }
@@ -1049,33 +1077,14 @@ NTSTATUS CopyFileIdInfo(_Inout_ PFLT_CALLBACK_DATA Data, PDRIVER_MESSAGE newItem
 
 /* FilePath should be allocated before*/
 NTSTATUS GetFileNameInfo(
-	_Inout_ PFLT_CALLBACK_DATA Data, 
 	_In_ PCFLT_RELATED_OBJECTS FltObjects,
 	PUNICODE_STRING FilePath, 
-	PFLT_FILE_NAME_INFORMATION * nameInfo,
-	PFILE_RENAME_INFORMATION renameInfo
+	PFLT_FILE_NAME_INFORMATION  nameInfo
 ) {
-	NTSTATUS hr = STATUS_SUCCESS;
-	if (renameInfo == nullptr) {
-		hr = FltGetFileNameInformation(Data, FLT_FILE_NAME_OPENED | FLT_FILE_NAME_QUERY_ALWAYS_ALLOW_CACHE_LOOKUP, nameInfo);
-		if (!NT_SUCCESS(hr))
-			return hr;
-	}
-	else {
-		hr = FltGetDestinationFileNameInformation(
-			FltObjects->Instance,
-			FltObjects->FileObject,
-			renameInfo->RootDirectory,
-			renameInfo->FileName,
-			renameInfo->FileNameLength,
-			FLT_FILE_NAME_QUERY_DEFAULT | FLT_FILE_NAME_REQUEST_FROM_CURRENT_PROVIDER | FLT_FILE_NAME_OPENED,
-			nameInfo);
-		if (!NT_SUCCESS(hr))
-			return hr;
-	}
-	hr = FltParseFileNameInformation(*nameInfo);
-	if (!NT_SUCCESS(hr)) {
-		FltReleaseFileNameInformation(*nameInfo);
+	NTSTATUS hr;
+	hr = FltParseFileNameInformation(nameInfo);
+	if (!NT_SUCCESS(hr))  {
+		FltReleaseFileNameInformation(nameInfo);
 		return hr;
 	}
 	/*hr = FSAllocateUnicodeString(FilePath);
@@ -1083,9 +1092,9 @@ NTSTATUS GetFileNameInfo(
 		FltReleaseFileNameInformation(*nameInfo);
 		return hr;
 	}*/
-	hr = FSEntrySetFileName(FltObjects->Volume, *nameInfo, FilePath);
+	hr = FSEntrySetFileName(FltObjects->Volume, nameInfo, FilePath);
 	if (!NT_SUCCESS(hr)) {
-		FltReleaseFileNameInformation(*nameInfo);
+		FltReleaseFileNameInformation(nameInfo);
 	}
 	return hr;
 }

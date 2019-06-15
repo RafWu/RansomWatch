@@ -15,6 +15,9 @@ ref class ProcessRecord {
 	BOOLEAN killed;
 	BOOLEAN safeProcess;
 	String^ appName;
+
+	DateTime startTime;
+
 	ULONGLONG totalReadOperations;
 	ULONGLONG totalWriteOperations;
 	ULONGLONG totalRenameOperations;
@@ -100,6 +103,8 @@ ref class ProcessRecord {
 		killed = FALSE;
 		safeProcess = FALSE;
 
+		startTime = DateTime::Now;
+
 		totalReadOperations = 0;
 		totalWriteOperations = 0;
 		totalRenameOperations = 0;
@@ -184,6 +189,8 @@ ref class ProcessRecord {
 		}
 		malicious = FALSE;
 		killed = FALSE;
+
+		startTime = DateTime::Now;
 
 		totalReadOperations = 0;
 		totalWriteOperations = 0;
@@ -510,6 +517,10 @@ ref class ProcessRecord {
 		return safeProcess;
 	}
 
+	// assumes that caller protect this call
+	public: DateTime Date() {
+		return startTime;
+	}
 
 	public: BOOLEAN isProcessMalicious() {
 		Monitor::Enter(this);
@@ -558,7 +569,6 @@ ref class ProcessRecord {
 		if (moveTrigger) {
 			triggersBreached->Add("Moving files");
 		}
-
 
 		BYTE triggersReached = deleteTrigger + createTrigger + 2 * renameTrigger + listingTrigger +
 			2 * highEntropyTrigger + 2 * extensionsTrigger  + 2 * trapsTrigger +

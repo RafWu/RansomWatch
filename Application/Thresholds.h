@@ -7,7 +7,7 @@ constexpr int MINIMUM_DIRS_THRESHOLD = 10;
 constexpr int MINIMUM_FILES_THRESHOLD = 30;
 
 // enable malicious check if process starts to write high entropy files
-constexpr int NUM_WRITES_FOR_TRIGGER = 10;
+constexpr int NUM_WRITES_FOR_TRIGGER = 5;
 
 // Triggers required for malicious
 constexpr char TRIGGERS_TRESHOLD = 8; // and if found NUM_WRITES_FOR_TRIGGER writes with high entropy

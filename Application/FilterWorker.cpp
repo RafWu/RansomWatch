@@ -134,21 +134,22 @@ VOID HandleMaliciousApplication(ProcessRecord^ record, HANDLE comPort) {
 		String^ pidStr = pid.ToString();
 		String^ appName = record->Name();
 		DWORD failReason = 0; 
-		
+		BOOLEAN isTerminateSuc;
+		DWORD isKilled;
 		Globals::Instance->postLogMessage(String::Concat("Handling malicious application: ", appName, " with pid: ", pidStr, System::Environment::NewLine), PRIORITY_PRINT);
 		if (Globals::Instance->getKillStat()) {
 			Globals::Instance->postLogMessage(String::Concat("Attempt to kill process using application", System::Environment::NewLine), PRIORITY_PRINT);
 			Monitor::Enter(record);
 			if (record->isMalicious() && !record->isKilled())
 			{
-				HANDLE pHandle = OpenProcess(PROCESS_TERMINATE, false, pid);
+				HANDLE pHandle = OpenProcess(PROCESS_TERMINATE | SYNCHRONIZE, false, pid);
 				if (pHandle != nullptr)
 				{
-					BOOLEAN isTerminateSuc = TerminateProcess(pHandle, 1); // exit with failure
+					isTerminateSuc = TerminateProcess(pHandle, 1); // exit with failure
 					if (isTerminateSuc)
 					{
-						DWORD isKilled = WaitForSingleObject(pHandle, 100); // 
-						if (isKilled != WAIT_TIMEOUT && isKilled != WAIT_FAILED) {
+						isKilled = WaitForSingleObject(pHandle, 100); // 
+						if (isKilled != WAIT_TIMEOUT) {
 							record->setKilled();
 							CloseHandle(pHandle);
 							Monitor::Exit(record);
@@ -156,12 +157,22 @@ VOID HandleMaliciousApplication(ProcessRecord^ record, HANDLE comPort) {
 							return;
 						}
 					}
-					failReason = GetLastError();
 					// reach here only if kill failed
 					CloseHandle(pHandle);
 				}
 				Monitor::Exit(record);
-				Globals::Instance->postLogMessage(String::Concat("Failed to kill process using application, using driver to kill. error code: ", failReason.ToString(),System::Environment::NewLine), PRIORITY_PRINT);
+				String^ failedOn;
+				failReason = GetLastError();
+				if (pHandle == nullptr) {
+					failedOn = gcnew String(" Failed on Open process");
+				}
+				else if (isTerminateSuc){
+					failedOn = isKilled.ToString();
+				}
+				else {
+					failedOn = gcnew String(" Failed Terminate process");
+				}
+				Globals::Instance->postLogMessage(String::Concat("Failed to kill process using application, using driver to kill. error code: ", failReason.ToString(), failedOn, System::Environment::NewLine), PRIORITY_PRINT);
 				COM_MESSAGE killPidMsg;
 				NTSTATUS retOp = S_OK;
 				DWORD retSize;
@@ -226,18 +237,30 @@ VOID CheckHandleMaliciousApplication(ULONG pid, HANDLE comPort) {
 
 			Generic::SortedSet<String^>^ createdFiles = record->GetCreatedFiles();
 			Generic::SortedSet<String^>^ changedFiles = record->GetChangedFiles();
-			String^ reportFile = String::Concat("C:\Report", record->Pid().ToString(), ".log");
+			String^ reportFile = String::Concat("C:\\Report", record->Pid().ToString(), ".log");
 			try {
 				StreamWriter^ sw = gcnew StreamWriter(reportFile);
 				sw->WriteLine("RansomWatch report file");
 				sw->Write("Files report for ransomware running from exe: ");
 				sw->WriteLine(record->Name());
+				sw->Write("Process started on time: ");
+				sw->WriteLine(record->Date());
+				sw->Write("Time report: ");
 				sw->WriteLine(DateTime::Now);
-				sw->WriteLine("Changed files:");
+				Monitor::Enter(record);
+				if (record->isKilled()) {
+					sw->WriteLine("Process has been killed");
+				}
+				Monitor::Exit(record);
+				sw->Write("Changed files: ");
+				int changedSize = changedFiles->Count;
+				sw->WriteLine(changedSize.ToString());
 				for each (String ^ filePath in changedFiles) {
 					sw->WriteLine(filePath);
 				}
-				sw->WriteLine("Created files:");
+				sw->Write("Created files: ");
+				int createdSize = createdFiles->Count;
+				sw->WriteLine(createdSize.ToString());
 				for each (String ^ filePath in createdFiles) {
 					sw->WriteLine(filePath);
 				}
