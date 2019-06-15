@@ -133,6 +133,7 @@ VOID HandleMaliciousApplication(ProcessRecord^ record, HANDLE comPort) {
 		ULONG pid = record->Pid();
 		String^ pidStr = pid.ToString();
 		String^ appName = record->Name();
+		DWORD failReason = 0; 
 		
 		Globals::Instance->postLogMessage(String::Concat("Handling malicious application: ", appName, " with pid: ", pidStr, System::Environment::NewLine), PRIORITY_PRINT);
 		if (Globals::Instance->getKillStat()) {
@@ -144,7 +145,7 @@ VOID HandleMaliciousApplication(ProcessRecord^ record, HANDLE comPort) {
 				if (pHandle != nullptr)
 				{
 					BOOLEAN isTerminateSuc = TerminateProcess(pHandle, 1); // exit with failure
-					if (!isTerminateSuc)
+					if (isTerminateSuc)
 					{
 						DWORD isKilled = WaitForSingleObject(pHandle, 100); // 
 						if (isKilled != WAIT_TIMEOUT && isKilled != WAIT_FAILED) {
@@ -155,10 +156,12 @@ VOID HandleMaliciousApplication(ProcessRecord^ record, HANDLE comPort) {
 							return;
 						}
 					}
+					failReason = GetLastError();
+					// reach here only if kill failed
 					CloseHandle(pHandle);
 				}
 				Monitor::Exit(record);
-				Globals::Instance->postLogMessage(String::Concat("Failed to kill process using application, using driver to kill",System::Environment::NewLine), PRIORITY_PRINT);
+				Globals::Instance->postLogMessage(String::Concat("Failed to kill process using application, using driver to kill. error code: ", failReason.ToString(),System::Environment::NewLine), PRIORITY_PRINT);
 				COM_MESSAGE killPidMsg;
 				NTSTATUS retOp = S_OK;
 				DWORD retSize;

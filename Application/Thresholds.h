@@ -1,5 +1,7 @@
 #pragma once
 
+#include "ExtensionsCategories.h"
+
 // minimum files and dirs required in protected area to check malicious
 constexpr int MINIMUM_DIRS_THRESHOLD = 10;
 constexpr int MINIMUM_FILES_THRESHOLD = 30;
@@ -8,7 +10,7 @@ constexpr int MINIMUM_FILES_THRESHOLD = 30;
 constexpr int NUM_WRITES_FOR_TRIGGER = 10;
 
 // Triggers required for malicious
-constexpr char TRIGGERS_TRESHOLD = 4; // and if found NUM_WRITES_FOR_TRIGGER writes with high entropy
+constexpr char TRIGGERS_TRESHOLD = 8; // and if found NUM_WRITES_FOR_TRIGGER writes with high entropy
 
 ///
 constexpr int ENTROPY_FILES_INCREASED_THRESHOLD = 20;
@@ -35,6 +37,9 @@ constexpr double FILES_EXTENSION_THRESHOLD		= 0.25;	// diff between number of ex
 
 // Extension change
 constexpr double CHANGE_EXTENSION_THRESHOLD		= 0.2;	// change extension out of accessed files
+
+// Extension sensitive
+constexpr double EXTENSION_OPENED_SENSITIVE		= 0.25;	// number of different categories that the application opened out of NUM_CATEGORIES_WITH_OTHERS
 
 // Listing
 constexpr double LISTING_THRESHOLD				= 0.4;	// listed directories out of all subdirs in protected area

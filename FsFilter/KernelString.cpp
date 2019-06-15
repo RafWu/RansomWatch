@@ -25,7 +25,7 @@ Return Value:
 
 	String->Buffer = (PWCH)ExAllocatePoolWithTag(NonPagedPool,
 		String->MaximumLength,
-		'AmfS');
+		'RW');
 
 	if (String->Buffer == NULL) {
 
@@ -61,7 +61,7 @@ Return Value:
 	if (String->Buffer) {
 
 		ExFreePoolWithTag(String->Buffer,
-			'AmfS');
+			'RW');
 		String->Buffer = NULL;
 	}
 

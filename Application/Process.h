@@ -46,6 +46,7 @@ ref class ProcessRecord {
 	Generic::SortedSet<String^>^ dirsTrapsActions;	 // dir paths of which an action took place on a trap, write, read, rename or delete
 	Generic::SortedSet<String^>^ triggersBreached;   // triggers that were breached, we use this to report later
 
+	array<BOOLEAN>^ extensionsCategories;
 	Generic::SortedSet<String^>^ extensionsRead;
 	Generic::SortedSet<String^>^ extensionsWrite;
 
@@ -129,12 +130,15 @@ ref class ProcessRecord {
 		dirsTrapsActions = gcnew Generic::SortedSet<String^>;
 		triggersBreached = gcnew Generic::SortedSet<String^>;
 
-		extensionsRead = gcnew Generic::SortedSet<String^>;
-		extensionsWrite = gcnew Generic::SortedSet<String^>;
+		extensionsCategories = gcnew array<BOOLEAN>(NUM_CATEGORIES_WITH_OTHERS);
+		for (ULONG i = 0; i < NUM_CATEGORIES_WITH_OTHERS; i++) {
+			extensionsCategories[i] = FALSE;
+		}
+		extensionsRead   = gcnew Generic::SortedSet<String^>;
+		extensionsWrite  = gcnew Generic::SortedSet<String^>;
 
 		sumWeightWriteEntropy = 0;
 		sumWeightReadEntropy = 0;
-		//ULONGLONG highEntropyReplaces;
 
 		totalReadBytes = 0;
 		totalWriteBytes = 0;
@@ -211,12 +215,15 @@ ref class ProcessRecord {
 		dirsTrapsActions = gcnew Generic::SortedSet<String^>;
 		triggersBreached = gcnew Generic::SortedSet<String^>;
 
+		extensionsCategories = gcnew array<BOOLEAN>(NUM_CATEGORIES_WITH_OTHERS);
+		for (ULONG i = 0; i < NUM_CATEGORIES_WITH_OTHERS; i++) {
+			extensionsCategories[i] = FALSE;
+		}
 		extensionsRead = gcnew Generic::SortedSet<String^>;
 		extensionsWrite = gcnew Generic::SortedSet<String^>;
 
 		sumWeightWriteEntropy = 0;
 		sumWeightReadEntropy = 0;
-		//ULONGLONG highEntropyReplaces;
 
 		totalReadBytes = 0;
 		totalWriteBytes = 0;
@@ -255,7 +262,7 @@ ref class ProcessRecord {
 			}
 			case IRP_CREATE: 
 			{
-				UpdateCreateInfo(Irp.FileChange, Irp.FileID, Irp.filePath);
+				UpdateCreateInfo(Irp.FileChange, Irp.FileID, Irp.filePath, Irp.Extension);
 				break;
 			}
 			case IRP_CLEANUP: 
@@ -335,7 +342,7 @@ ref class ProcessRecord {
 		}
 	}
 
-	private: void UpdateCreateInfo(UCHAR fileChangeEnum, const FILE_ID_INFO& idInfo, UNICODE_STRING filePath)
+	private: void UpdateCreateInfo(UCHAR fileChangeEnum, const FILE_ID_INFO& idInfo, UNICODE_STRING filePath, const LPCWSTR Extension)
 	{
 		DBOUT("Update create info for irp message " << fileChangeEnum << "\n");
 		FileId newId(idInfo);
@@ -344,6 +351,13 @@ ref class ProcessRecord {
 			fileIdsTraps->Add(newId);
 		}
 		totalCreateOperations++;
+		
+		USHORT category = ExtensionCategory(Extension);
+		if (category < NUM_CATEGORIES_WITH_OTHERS) {
+			extensionsCategories[category] = TRUE;
+		}
+		
+
 		switch (fileChangeEnum) {
 		case FILE_CHANGE_NEW_FILE:
 		{
@@ -528,10 +542,6 @@ ref class ProcessRecord {
 		if (extensionsChangeTrigger) {
 			triggersBreached->Add("Extensions changed");
 		}
-		BOOLEAN writeFilesTrigger = WriteToFilesTrigger(); // not operational
-		if (writeFilesTrigger) {
-			triggersBreached->Add("High writes threshold");
-		}
 		BOOLEAN trapsTrigger = TrapsTrigger(); // checked in other trigger but we do raise another trigger when work on traps reached certain point
 		if (trapsTrigger) {
 			triggersBreached->Add("Traps operations");
@@ -550,9 +560,9 @@ ref class ProcessRecord {
 		}
 
 
-		BYTE triggersReached = deleteTrigger + createTrigger + renameTrigger + listingTrigger +
-			highEntropyTrigger + extensionsTrigger + writeFilesTrigger + trapsTrigger +
-			readTrigger + accessTrigger + extensionsChangeTrigger + moveTrigger;
+		BYTE triggersReached = deleteTrigger + createTrigger + 2 * renameTrigger + listingTrigger +
+			2 * highEntropyTrigger + 2 * extensionsTrigger  + 2 * trapsTrigger +
+			readTrigger + 2 * accessTrigger + 2 * extensionsChangeTrigger + 2 * moveTrigger;
 		if (triggersReached >= TRIGGERS_TRESHOLD && highEntropyWrites >= NUM_WRITES_FOR_TRIGGER) { // TODO: want to remove num writes check
 			malicious = TRUE;
 			Monitor::Exit(this);
@@ -651,6 +661,13 @@ ref class ProcessRecord {
 
 	// check extension based on write and rename compared to read
 	private: BOOLEAN FileExtensionsTrigger() {
+		UCHAR numCategories = 0;
+		for (ULONG i = 0; i < NUM_CATEGORIES_WITH_OTHERS; i++) {
+			if (extensionsCategories[i]) numCategories++;
+		}
+		DOUBLE normNumCategories = ((DOUBLE)numCategories) / ((DOUBLE)NUM_CATEGORIES_WITH_OTHERS);
+		if (normNumCategories > EXTENSION_OPENED_SENSITIVE) return TRUE;
+
 		Generic::SortedSet<String^>^ extensionsUnion = gcnew Generic::SortedSet<String^>;
 		Generic::SortedSet<String^>^ extensionsIntersect = gcnew Generic::SortedSet<String^>;
 		extensionsUnion->UnionWith(extensionsWrite);

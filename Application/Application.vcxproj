@@ -145,12 +145,14 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Common.cpp" />
+    <ClCompile Include="ExtensionsCategories.cpp" />
     <ClCompile Include="FilterWorker.cpp" />
     <ClCompile Include="MyForm.cpp" />
     <ClCompile Include="TrapHandler.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Common.h" />
+    <ClInclude Include="ExtensionsCategories.h" />
     <ClInclude Include="FilterWorker.h" />
     <ClInclude Include="MyForm.h">
       <FileType>CppForm</FileType>
@@ -173,8 +175,10 @@
     <EmbeddedResource Include="Resource.resx" />
   </ItemGroup>
   <ItemGroup>
+    <Image Include="close.png" />
     <Image Include="icon.png" />
     <Image Include="iconSmall.ico" />
+    <Image Include="min.png" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

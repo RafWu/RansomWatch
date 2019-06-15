@@ -200,7 +200,6 @@ Return Value:
 	//
 
 	FltUnregisterFilter(driverData->getFilter());
-
 	delete driverData;
 	delete commHandle;
 
@@ -444,16 +443,6 @@ FSProcessPreOperartion(
 	// reset
 	PDRIVER_MESSAGE newItem = &newEntry->data;
 	PUNICODE_STRING FilePath = &(newEntry->filePath);
-	FilePath->MaximumLength = MAX_FILE_NAME_SIZE;
-	newItem->FileChange = FILE_CHANGE_NOT_SET;
-	newItem->FileLocationInfo = FILE_NOT_PROTECTED;
-	newItem->Entropy = 0;
-	newItem->isEntropyCalc = FALSE;
-	newItem->MemSizeUsed = 0;
-	newItem->filePath.Buffer = nullptr;
-	newItem->filePath.MaximumLength = 0;
-	newItem->filePath.Length = 0;
-	newItem->next = nullptr;
 
 	//get pid
 	newItem->PID = FltGetRequestorProcessId(Data);
@@ -461,6 +450,7 @@ FSProcessPreOperartion(
 	// get file id
 	hr = CopyFileIdInfo(Data, newItem);
 	if (!NT_SUCCESS(hr)) {
+		delete newEntry;
 		return hr;
 	}
 
@@ -491,18 +481,14 @@ FSProcessPreOperartion(
 	case IRP_MJ_READ:
 	{
 		newItem->IRP_OP = IRP_READ;
+		if (newItem->FileLocationInfo == FILE_NOT_PROTECTED) { // may remove
+			delete newEntry;
+			return FLT_PREOP_SUCCESS_NO_CALLBACK;
+		}
 		if (Data->Iopb->Parameters.Read.Length == 0) // no data to read
 		{
-			if (Data->Iopb->Parameters.Read.MdlAddress != NULL) { // fast io
-				if (Data->Iopb->Parameters.Read.MdlAddress->Size == 0) {
-					DbgPrint("!!! FSFilter: Preop IRP_MJ_READ, nothing to read \n");
-					break;
-				}
-			}
-			else {
-				DbgPrint("!!! FSFilter: Preop IRP_MJ_READ, nothing to read \n");
-				break;
-			}
+			delete newEntry;
+			return FLT_PREOP_SUCCESS_NO_CALLBACK;
 		}
 		DbgPrint("!!! FSFilter: Preop IRP_MJ_READ, return with postop \n");
 		// save context for post, we calculate the entropy of read, we pass the irp to application on post op
@@ -512,7 +498,6 @@ FSProcessPreOperartion(
 	case IRP_MJ_CLEANUP:
 		newItem->IRP_OP = IRP_CLEANUP;
 		if (newItem->FileLocationInfo == FILE_NOT_PROTECTED) {
-			FSFreeUnicodeString(FilePath);
 			delete newEntry;
 			return FLT_PREOP_SUCCESS_NO_CALLBACK;
 		}
@@ -520,6 +505,10 @@ FSProcessPreOperartion(
 	case IRP_MJ_WRITE:
 	{
 		newItem->IRP_OP = IRP_WRITE;
+		//if (newItem->FileLocationInfo == FILE_NOT_PROTECTED) {
+		//	delete newEntry;
+		//	return FLT_PREOP_SUCCESS_NO_CALLBACK;
+		//}
 		newItem->FileChange = FILE_CHANGE_WRITE;
 		PVOID writeBuffer = NULL;
 		if (Data->Iopb->Parameters.Write.Length == 0) // no data to write
@@ -535,7 +524,6 @@ FSProcessPreOperartion(
 			writeBuffer = MmGetSystemAddressForMdlSafe(Data->Iopb->Parameters.Write.MdlAddress, NormalPagePriority | MdlMappingNoExecute);
 		}
 		if (writeBuffer == NULL) { // alloc failed
-			FSFreeUnicodeString(FilePath);
 			delete newEntry;
 			// fail the irp request
 			Data->IoStatus.Status = STATUS_INSUFFICIENT_RESOURCES;
@@ -551,7 +539,6 @@ FSProcessPreOperartion(
 		}
 		__except (EXCEPTION_EXECUTE_HANDLER) {
 			DbgPrint("!!! FSFilter: Failed to calc entropy\n");
-			FSFreeUnicodeString(FilePath);
 			delete newEntry;
 			// fail the irp request
 			Data->IoStatus.Status = STATUS_INTERNAL_ERROR;
@@ -571,7 +558,7 @@ FSProcessPreOperartion(
 		{
 			newItem->FileChange = FILE_CHANGE_DELETE_FILE;
 			if (newItem->FileLocationInfo == FILE_NOT_PROTECTED) {
-				FSFreeUnicodeString(FilePath);
+				FltReleaseFileNameInformation(nameInfo);
 				delete newEntry;
 				return FLT_PREOP_SUCCESS_NO_CALLBACK;
 			}
@@ -581,7 +568,7 @@ FSProcessPreOperartion(
 			FlagOn(((PFILE_DISPOSITION_INFORMATION_EX)(Data->Iopb->Parameters.SetFileInformation.InfoBuffer))->Flags, FILE_DISPOSITION_DELETE)) {
 			newItem->FileChange = FILE_CHANGE_DELETE_FILE;
 			if (newItem->FileLocationInfo == FILE_NOT_PROTECTED) {
-				FSFreeUnicodeString(FilePath);
+				FltReleaseFileNameInformation(nameInfo);
 				delete newEntry;
 				return FLT_PREOP_SUCCESS_NO_CALLBACK;
 			}
@@ -594,12 +581,14 @@ FSProcessPreOperartion(
 			newItem->FileChange = FILE_CHANGE_RENAME_FILE;
 			PFILE_RENAME_INFORMATION renameInfo = (PFILE_RENAME_INFORMATION)Data->Iopb->Parameters.SetFileInformation.InfoBuffer;
 			PFLT_FILE_NAME_INFORMATION newNameInfo;
+			WCHAR Buffer[MAX_FILE_NAME_LENGTH];
 			UNICODE_STRING NewFilePath;
+			NewFilePath.Buffer = Buffer;
+			NewFilePath.Length = 0;
 			NewFilePath.MaximumLength = MAX_FILE_NAME_SIZE;
 			
 			NTSTATUS status = GetFileNameInfo(Data, FltObjects, &NewFilePath, &newNameInfo, renameInfo);
 			if (!NT_SUCCESS(status)) {
-				FSFreeUnicodeString(FilePath);
 				delete newEntry;
 				FltReleaseFileNameInformation(nameInfo);
 				return FLT_PREOP_SUCCESS_NO_CALLBACK;
@@ -608,21 +597,15 @@ FSProcessPreOperartion(
 			if (FSIsFileNameInScanDirs(&NewFilePath)) {
 				if (newItem->FileLocationInfo == FILE_NOT_PROTECTED) { // moved in - report new file name
 					newItem->FileLocationInfo = FILE_MOVED_IN;
-					FSFreeUnicodeString(FilePath);
-					newEntry->filePath = NewFilePath; // remember file moved in
-				}
-				else { // else we still report old file name so we know it was changed
-					FSFreeUnicodeString(&NewFilePath);
-				}
+					//newEntry->filePath = NewFilePath; // remember file moved in
+					RtlCopyBytes(newEntry->filePath.Buffer, Buffer, MAX_FILE_NAME_SIZE); // replace buffer data with new file
+				} // else we still report old file name so we know it was changed
 			}
 			else { // new file name not protected
 				if (newItem->FileLocationInfo == FILE_PROTECTED) { // moved out - report old file name
 					newItem->FileLocationInfo = FILE_MOVED_OUT;
-					FSFreeUnicodeString(&NewFilePath);
 				}
 				else { // we dont care - rename of file in unprotected area to unprotected area
-					FSFreeUnicodeString(&NewFilePath);
-					FSFreeUnicodeString(FilePath);
 					delete newEntry;
 					FltReleaseFileNameInformation(nameInfo);
 					FltReleaseFileNameInformation(newNameInfo);
@@ -632,7 +615,6 @@ FSProcessPreOperartion(
 
 			CopyExtension(newItem->Extension, newNameInfo);
 			FltReleaseFileNameInformation(newNameInfo);
-
 			for (LONG i = 0; i < FILE_OBJEC_MAX_EXTENSION_SIZE ; i++) {
 				if (i == (nameInfo->Extension.Length / 2)) break;
 				if (newItem->Extension[i] != nameInfo->Extension.Buffer[i]) {
@@ -640,25 +622,22 @@ FSProcessPreOperartion(
 					break;
 				}
 			}
+			FltReleaseFileNameInformation(nameInfo);
 		} // end rename
 		else // not rename or delete (set info)
 		{
-			FSFreeUnicodeString(FilePath);
 			delete newEntry;
 			FltReleaseFileNameInformation(nameInfo);
 			return FLT_PREOP_SUCCESS_NO_CALLBACK;
 		}
-		FltReleaseFileNameInformation(nameInfo);
 		break;
 	}
 	default :
-		FSFreeUnicodeString(FilePath);
 		delete newEntry;
 		return FLT_PREOP_SUCCESS_NO_CALLBACK;
 	}
-	DbgPrint("!!! FSFilter: Addung entry to irps %s\n", FltGetIrpName(Data->Iopb->MajorFunction));
+	DbgPrint("!!! FSFilter: Adding entry to irps %s\n", FltGetIrpName(Data->Iopb->MajorFunction));
 	if (!driverData->AddIrpMessage(newEntry)) {
-		FSFreeUnicodeString(FilePath);
 		delete newEntry;
 	}
 	return FLT_PREOP_SUCCESS_NO_CALLBACK;
@@ -696,29 +675,24 @@ Return Value:
 
 --*/
 {
-	FLT_POSTOP_CALLBACK_STATUS returnStatus = FLT_POSTOP_FINISHED_PROCESSING;
 
-	//
-	//  If this create was failing anyway, don't bother scanning now.
-	//
 	DbgPrint("!!! FSFilter: Enter post op for irp: %s, pid of process: %u\n", FltGetIrpName(Data->Iopb->MajorFunction), FltGetRequestorProcessId(Data));
 	if (!NT_SUCCESS(Data->IoStatus.Status) ||
 		(STATUS_REPARSE == Data->IoStatus.Status)) {
 		DbgPrint("!!! FSFilter: finished post operation, already failed \n");
+		if (CompletionContext != nullptr && Data->Iopb->MajorFunction == IRP_MJ_READ) {
+			delete (PIRP_ENTRY)CompletionContext;
+		}
 		return FLT_POSTOP_FINISHED_PROCESSING;
 	}
 
 	if (Data->Iopb->MajorFunction == IRP_MJ_CREATE) {
-		returnStatus = FSProcessCreateIrp(Data, FltObjects);
+		return FSProcessCreateIrp(Data, FltObjects);
 	}
 	else if (Data->Iopb->MajorFunction == IRP_MJ_READ) {
-		returnStatus = FSProcessPostReadIrp(Data, FltObjects, CompletionContext, Flags);
+		return FSProcessPostReadIrp(Data, FltObjects, CompletionContext, Flags);
 	}
-	else {
-		return FLT_POSTOP_FINISHED_PROCESSING;
-	}
-
-	return returnStatus;
+	return FLT_POSTOP_FINISHED_PROCESSING;
 }
 
 FLT_POSTOP_CALLBACK_STATUS
@@ -728,7 +702,7 @@ FSProcessCreateIrp(
 )
 {
 	NTSTATUS hr;
-	if (/*FlagOn(Data->Iopb->OperationFlags, SL_OPEN_TARGET_DIRECTORY) || */FlagOn(Data->Iopb->OperationFlags, SL_OPEN_PAGING_FILE)) {
+	if (FlagOn(Data->Iopb->OperationFlags, SL_OPEN_TARGET_DIRECTORY) || FlagOn(Data->Iopb->OperationFlags, SL_OPEN_PAGING_FILE)) {
 		return FLT_POSTOP_FINISHED_PROCESSING;
 	}
 
@@ -752,19 +726,15 @@ FSProcessCreateIrp(
 
 	newItem->PID = FltGetRequestorProcessId(Data);
 	newItem->IRP_OP = IRP_CREATE;
-	newItem->filePath.Buffer = nullptr;
-	newItem->filePath.MaximumLength = 0;
-	newItem->filePath.Length = 0;
-	newItem->next = nullptr;
-	PUNICODE_STRING FilePath = &(newEntry->filePath);
-	FilePath->MaximumLength = 2 * MAX_FILE_NAME_LENGTH;
-	newItem->FileChange = FILE_CHANGE_NOT_SET;
 	newItem->FileLocationInfo = FILE_PROTECTED;
-	newItem->Entropy = 0;
-	newItem->isEntropyCalc = FALSE;
+	PUNICODE_STRING FilePath = &(newEntry->filePath);
 
 	// get file id
 	hr = CopyFileIdInfo(Data, newItem);
+	if (!NT_SUCCESS(hr)) {
+		delete newEntry;
+		return FLT_POSTOP_FINISHED_PROCESSING;
+	}
 
 	hr = GetFileNameInfo(Data, FltObjects, FilePath, &nameInfo, nullptr);
 	if (!NT_SUCCESS(hr)) {
@@ -772,11 +742,12 @@ FSProcessCreateIrp(
 		return FLT_POSTOP_FINISHED_PROCESSING;
 	}
 
+	CopyExtension(newItem->Extension, nameInfo);
+
 	FltReleaseFileNameInformation(nameInfo);
 
 	if (!FSIsFileNameInScanDirs(FilePath)) {
 		DbgPrint("!!! FSFilter: Skipping uninterented file, not in scan area \n");
-		FSFreeUnicodeString(FilePath);
 		delete newEntry;
 		return FLT_POSTOP_FINISHED_PROCESSING;
 	}
@@ -784,10 +755,8 @@ FSProcessCreateIrp(
 	if (isDir && (Data->IoStatus.Information) == FILE_OPENED) {
 		DbgPrint("!!! FSFilter: Dir listing opened on existing directory\n");
 		newItem->FileChange = FILE_OPEN_DIRECTORY;
-		FSFreeUnicodeString(FilePath);
 	} else if (isDir) {
 		DbgPrint("!!! FSFilter: Dir but not listing, not importent \n");
-		FSFreeUnicodeString(FilePath);
 		delete newEntry;
 		return FLT_POSTOP_FINISHED_PROCESSING;
 	} else if ((Data->IoStatus.Information) == FILE_OVERWRITTEN || (Data->IoStatus.Information) == FILE_SUPERSEDED) {
@@ -800,12 +769,8 @@ FSProcessCreateIrp(
 	} else if ((Data->IoStatus.Information) == FILE_CREATED) {
 		newItem->FileChange = FILE_CHANGE_NEW_FILE;
 	}
-	else {
-		FSFreeUnicodeString(FilePath);
-	}
 	DbgPrint("!!! FSFilter: Adding entry to irps\n");
 	if (!driverData->AddIrpMessage(newEntry)) {
-		FSFreeUnicodeString(FilePath);
 		delete newEntry;
 	}
 	return FLT_POSTOP_FINISHED_PROCESSING;
@@ -827,7 +792,6 @@ FSProcessPostReadIrp(
 
 	if (driverData->isFilterClosed() || IsCommClosed()) {
 		DbgPrint("!!! FSFilter: Post op read, comm or filter closed\n");
-		FSFreeUnicodeString(&(entry->filePath));
 		delete entry;
 		return FLT_POSTOP_FINISHED_PROCESSING;
 	}
@@ -852,14 +816,12 @@ FSProcessPostReadIrp(
 		else {
 			Data->IoStatus.Status = STATUS_INTERNAL_ERROR;
 			Data->IoStatus.Information = 0;
-			FSFreeUnicodeString(&(entry->filePath));
 			delete entry;
 			return status;
 		}
 	}
 	if (!ReadBuffer)
 	{
-		FSFreeUnicodeString(&(entry->filePath));
 		delete entry;
 		Data->IoStatus.Status = STATUS_INSUFFICIENT_RESOURCES;
 		Data->IoStatus.Information = 0;
@@ -873,7 +835,6 @@ FSProcessPostReadIrp(
 
 	}
 	__except (EXCEPTION_EXECUTE_HANDLER) {
-		FSFreeUnicodeString(&(entry->filePath));
 		delete entry;
 		// fail the irp request
 		Data->IoStatus.Status = STATUS_INTERNAL_ERROR;
@@ -882,7 +843,6 @@ FSProcessPostReadIrp(
 	}
 	DbgPrint("!!! FSFilter: Addung entry to irps IRP_MJ_READ\n");
 	if (!driverData->AddIrpMessage(entry)) {
-		FSFreeUnicodeString(&(entry->filePath));
 		delete entry;
 	}
 	return FLT_POSTOP_FINISHED_PROCESSING;
@@ -923,7 +883,6 @@ FSProcessPostReadSafe(
 		}
 		status = STATUS_INSUFFICIENT_RESOURCES;
 	}
-	FSFreeUnicodeString(&(entry->filePath));
 	delete entry;
 	return FLT_POSTOP_FINISHED_PROCESSING;
 }
@@ -967,8 +926,10 @@ FSEntrySetFileName(
 	}
 	hr = IoVolumeDeviceToDosName(devObject, &volumeData);
 	if (!NT_SUCCESS(hr)) {
+		ObDereferenceObject(devObject);
 		return hr;
 	}
+	ASSERT(newTemp == volumeData.Buffer);
 
 	volumeDosNameSize = volumeData.Length;
 	finalNameSize = origNameSize - volumeNameSize + volumeDosNameSize; // not null terminated, in bytes
@@ -977,10 +938,11 @@ FSEntrySetFileName(
 	//DbgPrint("Name buffer: %wZ\n", nameInfo->Name);
 	
 	if (uString == NULL) {
+		ObDereferenceObject(devObject);
 		return STATUS_INVALID_ADDRESS;
 	}
 	if (volumeNameSize == origNameSize) { // file is the volume, don't need to do anything
-
+		ObDereferenceObject(devObject);
 		return RtlUnicodeStringCopy(uString, &nameInfo->Name);
 	}
 	
@@ -994,6 +956,7 @@ FSEntrySetFileName(
 		uString->Length = (finalNameSize > MAX_FILE_NAME_SIZE) ? MAX_FILE_NAME_SIZE : finalNameSize;
 		//DbgPrint("File name: %wZ\n", uString);	
 	}
+	ObDereferenceObject(devObject);
 	return hr;
 }
 
@@ -1084,6 +1047,7 @@ NTSTATUS CopyFileIdInfo(_Inout_ PFLT_CALLBACK_DATA Data, PDRIVER_MESSAGE newItem
 	return hr;
 }
 
+/* FilePath should be allocated before*/
 NTSTATUS GetFileNameInfo(
 	_Inout_ PFLT_CALLBACK_DATA Data, 
 	_In_ PCFLT_RELATED_OBJECTS FltObjects,
@@ -1114,15 +1078,14 @@ NTSTATUS GetFileNameInfo(
 		FltReleaseFileNameInformation(*nameInfo);
 		return hr;
 	}
-	hr = FSAllocateUnicodeString(FilePath);
+	/*hr = FSAllocateUnicodeString(FilePath);
 	if (!NT_SUCCESS(hr)) {
 		FltReleaseFileNameInformation(*nameInfo);
 		return hr;
-	}
+	}*/
 	hr = FSEntrySetFileName(FltObjects->Volume, *nameInfo, FilePath);
 	if (!NT_SUCCESS(hr)) {
 		FltReleaseFileNameInformation(*nameInfo);
-		FSFreeUnicodeString(FilePath);
 	}
 	return hr;
 }

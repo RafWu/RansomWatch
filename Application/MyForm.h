@@ -65,6 +65,8 @@ namespace AntiRansomWareApp {
 			Resources::ResourceManager^ s_pxResourceManager = (gcnew Resources::ResourceManager(pxResName, pxAssembly));
 			this->pictureBox1->Image = (cli::safe_cast<Drawing::Bitmap^>(s_pxResourceManager->GetObject("icon")));
 			this->Icon = (cli::safe_cast<System::Drawing::Icon^>(s_pxResourceManager->GetObject("iconSmall")));
+			this->Exit->Image = (cli::safe_cast<Drawing::Bitmap^>(s_pxResourceManager->GetObject("close")));
+			this->MinimizeButton->Image = (cli::safe_cast<Drawing::Bitmap^>(s_pxResourceManager->GetObject("min")));
 			context.Port = nullptr;
 			Globals::Instance->setTextBox(logViewer);
 			//context.Completion = nullptr;
@@ -125,19 +127,19 @@ namespace AntiRansomWareApp {
 			(cli::safe_cast<System::ComponentModel::ISupportInitialize^>(this->pictureBox1))->BeginInit();
 			this->SuspendLayout();
 			
-			this->Exit->Location = System::Drawing::Point(499, 13);
+			this->Exit->Location = System::Drawing::Point(512, 2);
 			this->Exit->Name = L"Exit";
-			this->Exit->Size = System::Drawing::Size(34, 23);
+			this->Exit->Size = System::Drawing::Size(22, 22); //23
 			this->Exit->TabIndex = 8;
-			this->Exit->Text = L"Exit";
+			//this->Exit->Text = L"Exit";
 			this->Exit->UseVisualStyleBackColor = true;
 			this->Exit->Click += gcnew System::EventHandler(this, &MyForm::button1_Click);
 			
-			this->MinimizeButton->Location = System::Drawing::Point(459, 13);
+			this->MinimizeButton->Location = System::Drawing::Point(486, 2);
 			this->MinimizeButton->Name = L"MinimizeButton";
-			this->MinimizeButton->Size = System::Drawing::Size(34, 23);
+			this->MinimizeButton->Size = System::Drawing::Size(22, 22);
 			this->MinimizeButton->TabIndex = 8;
-			this->MinimizeButton->Text = L"Min";
+			//this->MinimizeButton->Text = L"Min";
 			this->MinimizeButton->UseVisualStyleBackColor = true;
 			this->MinimizeButton->Click += gcnew System::EventHandler(this, &MyForm::MinimizeButton_Click);
 			

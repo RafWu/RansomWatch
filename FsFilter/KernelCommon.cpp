@@ -1,21 +1,15 @@
 #include "KernelCommon.h"
 
 void *__cdecl operator new(size_t size) {
-	return ExAllocatePoolWithTag(NonPagedPool, size, 'Amfd');
+	return ExAllocatePoolWithTag(NonPagedPool, size, 'RW');
 }
 
-void* __cdecl operator new[](size_t size) {
-	return ExAllocatePoolWithTag(NonPagedPool, size, 'Amfd');
-}
-
-void __cdecl operator delete(void *object, unsigned __int64 size) {
+void __cdecl operator delete(void *data, size_t size) {
 	UNREFERENCED_PARAMETER(size);
-	ExFreePoolWithTag(object, 'Amfd');
+	if (data != NULL)
+		ExFreePoolWithTag(data, 'RW');
 }
 
-void __cdecl operator delete[](void *object) {
-	ExFreePoolWithTag(object, 'Amfd');
-}
 
 // FIXME: add count param for copy length, MAX_FILE_NAME_LENGTH - 1 is default value
 NTSTATUS CopyWString(LPWSTR dest, LPCWSTR source, size_t size)
