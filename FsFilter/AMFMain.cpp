@@ -162,6 +162,10 @@ Return Value:
 	}
 	driverData->setFilterStart();
 	DbgPrint("loaded scanner successfully");
+	// new code
+	DbgPrint("");
+	// FIXME: check status and release in unload
+	PsSetCreateProcessNotifyRoutine(AddRemProcessRoutine, FALSE);
 	return STATUS_SUCCESS;
 }
 
@@ -202,7 +206,7 @@ Return Value:
 	FltUnregisterFilter(driverData->getFilter());
 	delete driverData;
 	delete commHandle;
-
+	PsSetCreateProcessNotifyRoutine(AddRemProcessRoutine, TRUE);
 	return STATUS_SUCCESS;
 }
 
@@ -395,7 +399,7 @@ Return Value:
 	
 	//print process name and pid
 	//if (NT_SUCCESS(hr)) {
-	DbgPrint("Enter preop for irp: %s, pid of process: %u, requestorMode: %d \n", FltGetIrpName(Data->Iopb->MajorFunction), FltGetRequestorProcessId(Data), Data->RequestorMode);
+	//DbgPrint("Enter preop for irp: %s, pid of process: %u, requestorMode: %d \n", FltGetIrpName(Data->Iopb->MajorFunction), FltGetRequestorProcessId(Data), Data->RequestorMode);
 		//ExFreePoolWithTag(name, 'PUR');
 	//}
 
@@ -423,7 +427,7 @@ FSProcessPreOperartion(
 {
 	// no communication
 	if (driverData->isFilterClosed() || IsCommClosed()) {
-		DbgPrint("!!! FSFilter: Filter is closed or Port is closed, skipping data\n");
+		//DbgPrint("!!! FSFilter: Filter is closed or Port is closed, skipping data\n");
 		return FLT_PREOP_SUCCESS_NO_CALLBACK;
 	}
 	NTSTATUS hr = FLT_PREOP_SUCCESS_NO_CALLBACK;
@@ -695,10 +699,10 @@ Return Value:
 --*/
 {
 
-	DbgPrint("!!! FSFilter: Enter post op for irp: %s, pid of process: %u\n", FltGetIrpName(Data->Iopb->MajorFunction), FltGetRequestorProcessId(Data));
+	//DbgPrint("!!! FSFilter: Enter post op for irp: %s, pid of process: %u\n", FltGetIrpName(Data->Iopb->MajorFunction), FltGetRequestorProcessId(Data));
 	if (!NT_SUCCESS(Data->IoStatus.Status) ||
 		(STATUS_REPARSE == Data->IoStatus.Status)) {
-		DbgPrint("!!! FSFilter: finished post operation, already failed \n");
+		//DbgPrint("!!! FSFilter: finished post operation, already failed \n");
 		if (CompletionContext != nullptr && Data->Iopb->MajorFunction == IRP_MJ_READ) {
 			delete (PIRP_ENTRY)CompletionContext;
 		}
@@ -727,7 +731,7 @@ FSProcessCreateIrp(
 
 	if (driverData->isFilterClosed() || IsCommClosed())
 	{
-		DbgPrint("!!! FSFilter: filter closed or comm closed, skip irp\n");
+		//DbgPrint("!!! FSFilter: filter closed or comm closed, skip irp\n");
 		return FLT_POSTOP_FINISHED_PROCESSING;
 	}
 
@@ -1107,5 +1111,24 @@ VOID CopyExtension(PWCHAR dest, PFLT_FILE_NAME_INFORMATION nameInfo) {
 	for (LONG i = 0; i < FILE_OBJEC_MAX_EXTENSION_SIZE; i++) {
 		if (i == (nameInfo->Extension.Length / 2)) break;
 		dest[i] = nameInfo->Extension.Buffer[i];
+	}
+}
+
+// new code process recording
+VOID AddRemProcessRoutine(
+	HANDLE ParentId,
+	HANDLE ProcessId,
+	BOOLEAN Create
+) {
+	UNREFERENCED_PARAMETER(ParentId);
+	UNREFERENCED_PARAMETER(ProcessId);
+	if (Create) {
+		DbgPrint("!!! FSFilter: New Process, parent: %d pid. Process: %d pid\n", /*buff*/ (ULONG_PTR)ParentId, /*buff2, */(ULONG_PTR)ProcessId);
+
+		//DriverData->AddRepStrings(buff, buff2);
+
+	}
+	else {
+		DbgPrint("!!! FSFilter: Terminate Process, Process: %d pid\n", (ULONG_PTR)ProcessId);
 	}
 }

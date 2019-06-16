@@ -14,7 +14,6 @@ constexpr char TRIGGERS_TRESHOLD = 8; // and if found NUM_WRITES_FOR_TRIGGER wri
 
 ///
 constexpr int ENTROPY_FILES_INCREASED_THRESHOLD = 20;
-constexpr double ENTROPY_INCREASED_THRESHOLD	= 1.2;
 
 // Access
 constexpr double ACCESS_FILES_TRESHOLDS			= 0.45;	// accessed to write out of read

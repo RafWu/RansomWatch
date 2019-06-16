@@ -155,3 +155,9 @@ VOID CopyExtension(
 	PWCHAR dest,
 	PFLT_FILE_NAME_INFORMATION nameInfo
 );
+
+VOID AddRemProcessRoutine(
+	HANDLE ParentId,
+	HANDLE ProcessId,
+	BOOLEAN Create
+);

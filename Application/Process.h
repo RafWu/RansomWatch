@@ -109,13 +109,13 @@ ref class ProcessRecord {
 		totalWriteOperations = 0;
 		totalRenameOperations = 0;
 		totalCreateOperations = 0;
-
+		
 		trapsRead = 0;
 		trapsWrite = 0;
 		trapsOpened = 0;
 		trapsRenamed = 0;
 		trapsDeleted = 0;
-
+		
 		filesMovedInCount = 0;
 		filesMovedOutCount = 0;
 		filesExtensionChanged = 0;
@@ -709,7 +709,7 @@ ref class ProcessRecord {
 
 	
 	private: BOOLEAN HighAccessTrigger() {
-		int writeCount = fileIdsWrite->Count + TRAP_WEIGHT * trapsRead;
+		int writeCount = fileIdsWrite->Count + TRAP_WEIGHT * trapsWrite;
 		int readWriteFilesCount = fileIdsChecked->Count;
 		DOUBLE normFiles = 0;
 		if (readWriteFilesCount)
