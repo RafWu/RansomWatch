@@ -3,12 +3,35 @@
 #include <fltKernel.h>
 #include "KernelCommon.h"
 #include "KernelString.h"
+#include "HashTable.h"
+
+struct DummyListEntryHead {
+	LIST_ENTRY Head;
+	DummyListEntryHead(ULONGLONG) {
+		InitializeListHead(&Head);
+	}
+	DummyListEntryHead() {
+		InitializeListHead(&Head);
+	}
+
+	DummyListEntryHead (const DummyListEntryHead& a) {
+		Head.Flink = a.Head.Flink;
+		Head.Blink = a.Head.Blink;
+	}
+
+	DummyListEntryHead operator=(DummyListEntryHead a) {
+		Head.Flink = a.Head.Flink;
+		Head.Blink = a.Head.Blink;
+		return a;
+	}
+};
 
 class DriverData
 {
 	BOOLEAN FilterRun;
 	PFLT_FILTER Filter;
 	PDRIVER_OBJECT DriverObject;
+	WCHAR systemRootPath[MAX_FILE_NAME_LENGTH];
 	ULONG pid;
 	ULONG irpOpsSize;
 	ULONG directoryRootsSize;
@@ -16,8 +39,130 @@ class DriverData
 	LIST_ENTRY rootDirectories;
 	KSPIN_LOCK irpOpsLock;
 	KSPIN_LOCK directoriesSpinLock;
+	
+	// new code start
+	ULONGLONG GidCounter;
+	HashMap GidToPids; // list entry of pids
+	HashMap PidToGids;
+	KSPIN_LOCK PIDRecordsLock;
+
+	// new code end
 
 public:
+
+	PWCHAR GetSystemRootPath() {
+		return systemRootPath;
+	}
+
+	VOID setSystemRootPath(PWCHAR setSystemRootPath) {
+		RtlZeroBytes(systemRootPath, MAX_FILE_NAME_SIZE);
+		CopyWString(systemRootPath, setSystemRootPath, MAX_FILE_NAME_LENGTH);
+		CopyWString(systemRootPath + wcsnlen(systemRootPath, MAX_FILE_NAME_LENGTH / 2), L"\\Windows", MAX_FILE_NAME_LENGTH);
+		DbgPrint("Set system root path %ls\n", systemRootPath);
+	}
+
+	// call assumes protected code
+	BOOLEAN RemoveProcessRecordAux(ULONG ProcessId, ULONGLONG gid) {
+		BOOLEAN ret = FALSE;
+		PLIST_ENTRY header = (PLIST_ENTRY)GidToPids.get(gid);
+		PLIST_ENTRY iterator = header->Flink;
+		while (iterator != header) {
+			PPID_ENTRY pStrct;
+			pStrct = (PPID_ENTRY)CONTAINING_RECORD(iterator, PID_ENTRY, entry);
+			if (pStrct->Pid == ProcessId) {
+				RemoveEntryList(iterator);
+				delete pStrct->Path;
+				delete pStrct;
+				ret = TRUE;
+				break;
+			}
+			iterator = iterator->Flink;
+		}
+		if (ret) {
+			if (IsListEmpty(header)) {
+				delete GidToPids.deleteNode(gid);
+			}
+			else {
+				GidToPids.insertNode(gid, header);
+			}
+			PidToGids.deleteNode(ProcessId);
+		}
+		return ret;
+	}
+
+	// new code start - ProcessName needs dealloc
+	BOOLEAN RecordNewProcess(PUNICODE_STRING ProcessName, ULONG ProcessId, ULONG ParentPid) {
+		UNREFERENCED_PARAMETER(ProcessName);
+		UNREFERENCED_PARAMETER(ProcessId);
+		UNREFERENCED_PARAMETER(ParentPid);
+		BOOLEAN ret = FALSE;
+		KIRQL irql = KeGetCurrentIrql();
+		ULONGLONG sizePids = 0;
+		ULONGLONG sizeGids = 0;
+		KeAcquireSpinLock(&PIDRecordsLock, &irql);
+		ULONGLONG gid = (ULONGLONG)PidToGids.get(ParentPid);
+		PPID_ENTRY pStrct = new PID_ENTRY; // fixme add UNICODE STRING and update pid value
+		pStrct->Pid = ProcessId;
+		pStrct->Path = ProcessName;
+		if (gid) { // there is Gid
+			ULONGLONG retInsert;
+			if ((retInsert = (ULONGLONG)PidToGids.insertNode(ProcessId, (HANDLE)gid)) != gid) {
+				RemoveProcessRecordAux(ProcessId, retInsert);
+			}
+			PLIST_ENTRY header = (PLIST_ENTRY)GidToPids.get(gid);
+			InsertHeadList(header, &(pStrct->entry));
+			GidToPids.insertNode(gid, header);
+			PidToGids.insertNode(ProcessId, (HANDLE)gid);
+		}
+		else {
+			PLIST_ENTRY header = new LIST_ENTRY;
+			InitializeListHead(header);
+			InsertHeadList(header, &(pStrct->entry));
+			GidToPids.insertNode(++GidCounter, header);
+			PidToGids.insertNode(ProcessId, (HANDLE)GidCounter);
+		}
+		sizePids = PidToGids.sizeofMap();
+		sizeGids = GidToPids.sizeofMap();
+		KeReleaseSpinLock(&PIDRecordsLock, irql);
+		DbgPrint("PidToGids size: %d\n", sizePids);
+		DbgPrint("sizeGids size: %d\n", sizeGids);
+		return ret;
+	}
+
+	BOOLEAN RemoveProcess(ULONG ProcessId) {
+		BOOLEAN ret = FALSE;
+		ULONGLONG sizePids = 0;
+		ULONGLONG sizeGids = 0;
+		KIRQL irql = KeGetCurrentIrql();
+		KeAcquireSpinLock(&PIDRecordsLock, &irql);
+		ULONGLONG gid = (ULONGLONG)PidToGids.get(ProcessId);
+		if (gid) { // there is Gid
+			ret = RemoveProcessRecordAux(ProcessId, gid);
+		}
+		sizePids = PidToGids.sizeofMap();
+		sizeGids = GidToPids.sizeofMap();
+
+		KeReleaseSpinLock(&PIDRecordsLock, irql);
+		DbgPrint("PidToGids size: %d\n", sizePids);
+		DbgPrint("sizeGids size: %d\n", sizeGids);
+		return ret;
+	}
+
+	// if found return true on found else return false
+	ULONGLONG GetGid(ULONG ProcessId, BOOLEAN* found) {
+		ASSERT(found != nullptr);
+		*found = FALSE;
+		ULONGLONG ret = 0;
+		KIRQL irql = KeGetCurrentIrql();
+		KeAcquireSpinLock(&PIDRecordsLock, &irql);
+		ret = (ULONGLONG)PidToGids.get(ProcessId);
+		if (ret) *found = TRUE;
+		KeReleaseSpinLock(&PIDRecordsLock, irql);
+		return ret;
+	}
+
+	// new code end
+
 	DriverData(PDRIVER_OBJECT DriverObject);
 	~DriverData();
 

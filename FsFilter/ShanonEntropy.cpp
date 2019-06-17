@@ -7,7 +7,7 @@ constexpr ULONG MAX_BYTE_SIZE = 256;
 
 DOUBLE shannonEntropy(PUCHAR buffer, size_t size)
 {
-	DbgPrint("!!! FSFilter: Calc entropy started\n");
+	if (IS_DEBUG_IRP) DbgPrint("!!! FSFilter: Calc entropy started\n");
 	DOUBLE entropy = 0.0;
 	ULONG bucketByteVals[MAX_BYTE_SIZE] = {};
 	for (ULONG i = 0; i < size; i++)

@@ -69,13 +69,13 @@ namespace AntiRansomWareApp {
 			this->MinimizeButton->Image = (cli::safe_cast<Drawing::Bitmap^>(s_pxResourceManager->GetObject("min")));
 			context.Port = nullptr;
 			Globals::Instance->setTextBox(logViewer);
-			//context.Completion = nullptr;
 			openKernelCommunication();
 
 			trapHandler = new TrapHandler(); // FIXME: protect catch throw
 			if (trapHandler == nullptr) {
 				throw "aa";
 			}
+
 		}
 
 	protected:

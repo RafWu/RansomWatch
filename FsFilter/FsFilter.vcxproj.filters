@@ -62,6 +62,9 @@
     <ClInclude Include="ShanonEntropy.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="HashTable.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Inf Include="FsFilter.inf">

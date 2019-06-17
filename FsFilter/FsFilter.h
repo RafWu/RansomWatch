@@ -28,7 +28,6 @@ Environment:
 #include "DriverData.h"
 #include "ShanonEntropy.h"
 
-
 NTSTATUS
 FSUnloadDriver(
 	_In_ FLT_FILTER_UNLOAD_FLAGS Flags

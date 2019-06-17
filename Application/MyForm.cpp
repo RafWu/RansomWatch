@@ -41,11 +41,30 @@ void AntiRansomWareApp::MyForm::openKernelCommunication() {
 		HRESULT res = S_OK;
 		//Globals::Instance->setCommCloseStat(FALSE);
 
+		WCHAR Buffer[4];
+		WCHAR WindowsPath[MAX_PATH];
+		WCHAR szNtDeviceName[MAX_PATH];
+		GetEnvironmentVariable(L"SYSTEMROOT", WindowsPath, MAX_PATH);
+		for (ULONG i = 0; i < 4; i++) {
+			if (WindowsPath[i] == L'\\') {
+				Buffer[i] = L'\0';
+				break;
+			}
+			Buffer[i] = WindowsPath[i];
+		}
+
+		// TODO: if fail driver cant work
+		if (!QueryDosDevice(Buffer, szNtDeviceName, MAX_PATH))
+		{
+			
+		}
+
+
 		DBOUT("Kernel com init successfully, setting app pid to driver" << std::endl);
 		COM_MESSAGE setPidMsg;
 		setPidMsg.type = MESSAGE_SET_PID;
 		setPidMsg.pid = GetCurrentProcessId();
-		setPidMsg.path[0] = L'\0';
+		RtlCopyMemory(setPidMsg.path, szNtDeviceName, MAX_PATH * sizeof(WCHAR));
 		DWORD tmp;
 		HRESULT hr = FilterSendMessage(context.Port, &setPidMsg, sizeof(COM_MESSAGE), NULL, 0, &tmp);
 		if (FAILED(hr)) {

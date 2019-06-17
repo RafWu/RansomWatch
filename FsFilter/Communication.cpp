@@ -96,7 +96,6 @@ AMFConnect(
 	//
 
 	commHandle->ClientPort = ClientPort;
-	commHandle->CommClosed = FALSE;
 	DbgPrint("!!! user connected, port=0x%p\n", ClientPort);
 
 	return STATUS_SUCCESS;
@@ -194,6 +193,9 @@ NTSTATUS AMFNewMessage(
 	else if (message->type == MESSAGE_SET_PID) {
 		if (message->pid != 0) {
 			driverData->setPID(message->pid);
+			driverData->setSystemRootPath(message->path);
+			commHandle->CommClosed = FALSE;
+
 			return STATUS_SUCCESS;
 		}
 		return STATUS_INVALID_PARAMETER;

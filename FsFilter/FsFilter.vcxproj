@@ -173,6 +173,7 @@
     </Link>
     <ClCompile>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <Optimization>Disabled</Optimization>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'">
@@ -202,6 +203,7 @@
     <ClInclude Include="Communication.h" />
     <ClInclude Include="DriverData.h" />
     <ClInclude Include="FsFilter.h" />
+    <ClInclude Include="HashTable.h" />
     <ClInclude Include="KernelCommon.h" />
     <ClInclude Include="KernelString.h" />
     <ClInclude Include="ShanonEntropy.h" />
