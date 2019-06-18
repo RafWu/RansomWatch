@@ -34,14 +34,14 @@ enum COM_MESSAGE_TYPE {
 	MESSAGE_REM_SCAN_DIRECTORY,
 	MESSAGE_GET_OPS,
 	MESSAGE_SET_PID,
-	MESSAGE_KILL_PID // FIXME: check
+	MESSAGE_KILL_GID
 	
-
 };
 
 typedef struct _COM_MESSAGE {
 	ULONG type;
 	ULONG pid;
+	ULONGLONG gid;
 	WCHAR path[MAX_FILE_NAME_LENGTH];
 	
 } COM_MESSAGE, *PCOM_MESSAGE;
@@ -74,7 +74,7 @@ enum IRP_MAJOR_OP {
 	IRP_CLEANUP 
 };
 
-// -64- bytes structure, fixed to 96 bytes
+// -64- bytes structure, fixed to -96- bytes, fixed to 104 bytes
 typedef struct _DRIVER_MESSAGE {
 	WCHAR Extension[FILE_OBJEC_MAX_EXTENSION_SIZE + 1]; // null terminated 24 bytes
 
@@ -92,6 +92,7 @@ typedef struct _DRIVER_MESSAGE {
 	UCHAR FileChange; // 1 byte
 	UCHAR FileLocationInfo; // 1 byte align
 	UNICODE_STRING filePath; // 16 bytes unicode string - filename, also contains size and max size, buffer is outside the struct
+	ULONGLONG Gid; // 8 bytes process ransomwatch gid
 	PVOID next; // 8 bytes - next PDRIVER_MESSAGE, we use it to allow adding the fileName to the same buffer, this pointer should point to the next PDRIVER_MESSAGE in buffer (kernel handled)
 	
 } DRIVER_MESSAGE, *PDRIVER_MESSAGE;

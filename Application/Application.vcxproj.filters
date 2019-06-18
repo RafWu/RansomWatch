@@ -30,6 +30,9 @@
     <ClCompile Include="ExtensionsCategories.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="BackupService.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="MyForm.h">
@@ -60,6 +63,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="ExtensionsCategories.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="BackupService.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -133,12 +133,6 @@ typedef NTSTATUS(*QUERY_INFO_PROCESS) (
 
 QUERY_INFO_PROCESS ZwQueryInformationProcess;
 
-NTSTATUS
-GetProcessImageName(
-	PEPROCESS eProcess,
-	PUNICODE_STRING ProcessImageName
-);
-
 NTSTATUS CopyFileIdInfo(
 	_Inout_ PFLT_CALLBACK_DATA Data, 
 	PDRIVER_MESSAGE newItem

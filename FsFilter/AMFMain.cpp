@@ -386,21 +386,6 @@ Return Value:
 
 		return FLT_PREOP_SUCCESS_NO_CALLBACK;
 	}
-	//UNICODE_STRING name;
-	//WCHAR strBuffer[(sizeof(UNICODE_STRING) / sizeof(WCHAR)) + 260];
-	//name = (UNICODE_STRING)&strBuffer;
-	//name.Buffer = &strBuffer[sizeof(UNICODE_STRING) / sizeof(WCHAR)];
-	//name.Length = 0x0;
-	//name.MaximumLength = 260 * sizeof(WCHAR);
-
-	//PEPROCESS proc = FltGetRequestorProcess(Data);
-	//hr = GetProcessImageName(proc, &name);
-	
-	//print process name and pid
-	//if (NT_SUCCESS(hr)) {
-	//DbgPrint("Enter preop for irp: %s, pid of process: %u, requestorMode: %d \n", FltGetIrpName(Data->Iopb->MajorFunction), FltGetRequestorProcessId(Data), Data->RequestorMode);
-		//ExFreePoolWithTag(name, 'PUR');
-	//}
 
 	if (FltObjects->FileObject == NULL) { //no file object
 		return FLT_PREOP_SUCCESS_NO_CALLBACK;
@@ -445,6 +430,7 @@ FSProcessPreOperartion(
 
 	PIRP_ENTRY newEntry = new IRP_ENTRY();
 	if (newEntry == NULL) {
+		FltReferenceFileNameInformation(nameInfo);
 		return hr;
 	}
 	// reset
@@ -454,6 +440,7 @@ FSProcessPreOperartion(
 
 	hr = GetFileNameInfo(FltObjects, FilePath, nameInfo);
 	if (!NT_SUCCESS(hr)) {
+		FltReferenceFileNameInformation(nameInfo);
 		delete newEntry;
 		return hr;
 	}
@@ -461,9 +448,21 @@ FSProcessPreOperartion(
 	//get pid
 	newItem->PID = FltGetRequestorProcessId(Data);
 
+	BOOLEAN isGidFound;
+	ULONGLONG gid = driverData->GetProcessGid(newItem->PID, &isGidFound);
+	if (gid == 0 || !isGidFound) {
+		//DbgPrint("!!! FSFilter: Item does not have a gid, skipping\n"); // TODO: incase it doesnt exist we can add it with our method that checks for system process
+		FltReferenceFileNameInformation(nameInfo);
+		delete newEntry;
+		return FLT_PREOP_SUCCESS_NO_CALLBACK;
+	}
+	newItem->Gid = gid;
+	DbgPrint("!!! FSFilter: Registring new irp for Gid: %d with pid: %d\n", gid, newItem->PID); // TODO: incase it doesnt exist we can add it with our method that checks for system process
+
 	// get file id
 	hr = CopyFileIdInfo(Data, newItem);
 	if (!NT_SUCCESS(hr)) {
+		FltReferenceFileNameInformation(nameInfo);
 		delete newEntry;
 		return hr;
 	}
@@ -749,6 +748,7 @@ FSProcessCreateIrp(
 
 	PIRP_ENTRY newEntry = new IRP_ENTRY();
 	if (newEntry == NULL) {
+		FltReleaseFileNameInformation(nameInfo);
 		return FLT_POSTOP_FINISHED_PROCESSING;
 	}
 	PDRIVER_MESSAGE newItem = &newEntry->data;
@@ -757,6 +757,17 @@ FSProcessCreateIrp(
 	newItem->IRP_OP = IRP_CREATE;
 	newItem->FileLocationInfo = FILE_PROTECTED;
 	PUNICODE_STRING FilePath = &(newEntry->filePath);
+
+	BOOLEAN isGidFound;
+	ULONGLONG gid = driverData->GetProcessGid(newItem->PID, &isGidFound);
+	if (gid == 0 || !isGidFound) {
+		//DbgPrint("!!! FSFilter: Item does not have a gid, skipping\n"); // TODO: incase it doesnt exist we can add it with our method that checks for system process
+		FltReferenceFileNameInformation(nameInfo);
+		delete newEntry;
+		return FLT_POSTOP_FINISHED_PROCESSING;
+	}
+	newItem->Gid = gid;
+	DbgPrint("!!! FSFilter: Registring new irp for Gid: %d with pid: %d\n", gid, newItem->PID); // TODO: incase it doesnt exist we can add it with our method that checks for system process
 
 	// get file id
 	hr = CopyFileIdInfo(Data, newItem);
@@ -932,9 +943,6 @@ FSEntrySetFileName(
 	PUNICODE_STRING uString
 )
 {
-	//UNREFERENCED_PARAMETER(Volume);
-	//UNREFERENCED_PARAMETER(nameInfo);
-	//UNREFERENCED_PARAMETER(uString);
 	NTSTATUS hr = STATUS_SUCCESS;
 	PDEVICE_OBJECT devObject;
 	USHORT volumeDosNameSize;
@@ -991,81 +999,6 @@ FSEntrySetFileName(
 	return hr;
 }
 
-NTSTATUS
-GetProcessImageName(
-    PEPROCESS eProcess,
-    PUNICODE_STRING ProcessImageName
-    )
-{
-    NTSTATUS status = STATUS_UNSUCCESSFUL;
-    ULONG returnedLength;
-    HANDLE hProcess = NULL;
-
-    PAGED_CODE(); // this eliminates the possibility of the IDLE Thread/Process
-
-    if (eProcess == NULL)
-    {
-        return STATUS_INVALID_PARAMETER_1;
-    }
-
-    status = ObOpenObjectByPointer(eProcess,
-        0, NULL, 0, 0, KernelMode, &hProcess);
-    if (!NT_SUCCESS(status))
-    {
-		if (IS_DEBUG_IRP) DbgPrint("ObOpenObjectByPointer Failed: %08x\n", status);
-        return status;
-    }
-
-    if (ZwQueryInformationProcess == NULL)
-    {
-        UNICODE_STRING routineName = RTL_CONSTANT_STRING(L"ZwQueryInformationProcess");
-
-        ZwQueryInformationProcess =
-            (QUERY_INFO_PROCESS)MmGetSystemRoutineAddress(&routineName);
-
-        if (ZwQueryInformationProcess == NULL)
-        {
-            DbgPrint("Cannot resolve ZwQueryInformationProcess\n");
-            status = STATUS_UNSUCCESSFUL;
-            goto cleanUp;
-        }
-    }
-
-    /* Query the actual size of the process path */
-    status = ZwQueryInformationProcess(hProcess,
-        ProcessImageFileName,
-        NULL, // buffer
-        0,    // buffer size
-        &returnedLength);
-
-    if (STATUS_INFO_LENGTH_MISMATCH != status) {
-        DbgPrint("ZwQueryInformationProcess status = %x\n", status);
-        goto cleanUp;
-    }
-	//*ProcessImageName = ExAllocatePoolWithTag(NonPagedPool, 512, 'PUR');
-	
-    if (ProcessImageName == NULL)
-    {
-        status = STATUS_INSUFFICIENT_RESOURCES;
-        goto cleanUp;
-    }
-
-    /* Retrieve the process path from the handle to the process */
-    status = ZwQueryInformationProcess(hProcess,
-        ProcessImageFileName,
-        ProcessImageName,
-        returnedLength,
-        &returnedLength);
-
-    //if (!NT_SUCCESS(status)) ExFreePoolWithTag(*ProcessImageName, 'PUR');
-
-cleanUp:
-
-    ZwClose(hProcess);
-
-    return status;
-}
-
 NTSTATUS CopyFileIdInfo(_Inout_ PFLT_CALLBACK_DATA Data, PDRIVER_MESSAGE newItem) {
 	FILE_ID_INFORMATION fileInformation;
 	NTSTATUS hr = FltQueryInformationFile(Data->Iopb->TargetInstance,
@@ -1090,11 +1023,6 @@ NTSTATUS GetFileNameInfo(
 		FltReleaseFileNameInformation(nameInfo);
 		return hr;
 	}
-	/*hr = FSAllocateUnicodeString(FilePath);
-	if (!NT_SUCCESS(hr)) {
-		FltReleaseFileNameInformation(*nameInfo);
-		return hr;
-	}*/
 	hr = FSEntrySetFileName(FltObjects->Volume, nameInfo, FilePath);
 	if (!NT_SUCCESS(hr)) {
 		FltReleaseFileNameInformation(nameInfo);
@@ -1113,7 +1041,7 @@ VOID CopyExtension(PWCHAR dest, PFLT_FILE_NAME_INFORMATION nameInfo) {
 	}
 }
 
-NTSTATUS GetProcessNameByHandle(_In_ HANDLE ProcessHandle, _Out_ PUNICODE_STRING* Name)
+static NTSTATUS GetProcessNameByHandle(_In_ HANDLE ProcessHandle, _Out_ PUNICODE_STRING* Name)
 {
 	ULONG retLength = 0;
 	ULONG pniSize = 512;
@@ -1121,7 +1049,7 @@ NTSTATUS GetProcessNameByHandle(_In_ HANDLE ProcessHandle, _Out_ PUNICODE_STRING
 	NTSTATUS status = STATUS_UNSUCCESSFUL;
 
 	do {
-		pni = (PUNICODE_STRING)ExAllocatePoolWithTag(PagedPool, pniSize, 'RW');
+		pni = (PUNICODE_STRING)ExAllocatePoolWithTag(NonPagedPool, pniSize, 'RW');
 		if (pni != NULL) {
 			status = ZwQueryInformationProcess(ProcessHandle, ProcessImageFileName, pni, pniSize, &retLength);
 			if (!NT_SUCCESS(status)) {
@@ -1195,11 +1123,7 @@ VOID AddRemProcessRoutine(
 			}
 			return;
 		}
-		/*
-		PEPROCESS* ParentEproc;
-		PEPROCESS* ProcessEproc;
-		PsLookupProcessByProcessId(ParentId, ParentEproc);
-		PsLookupProcessByProcessId(ProcessId, ProcessEproc);*/
+
 		PUNICODE_STRING procName;
 		PUNICODE_STRING parentName;
 		hr = GetProcessNameByHandle(procHandleParent, &parentName);
@@ -1212,44 +1136,9 @@ VOID AddRemProcessRoutine(
 			DbgPrint("!!! FSFilter: Failed to get process name: %#010x\n", hr);
 			return;
 		}
-		/*
-		ULONG returnedLength = 0;
-		WCHAR buff[MAX_FILE_NAME_LENGTH];
-		RtlZeroBytes(buff, MAX_FILE_NAME_SIZE);
-		UNICODE_STRING ParentUnicodeString;
-		ParentUnicodeString.Buffer = buff;
-		ParentUnicodeString.Length = 0;
-		ParentUnicodeString.MaximumLength = MAX_FILE_NAME_SIZE;
 
-		hr = ZwQueryInformationProcess(procHandleParent,
-			ProcessImageFileName,
-			&ParentUnicodeString,
-			MAX_FILE_NAME_SIZE,
-			&returnedLength);
-		if (!NT_SUCCESS(hr)) {
-			DbgPrint("!!! FSFilter: Failed to get parent name: %#010x. return length: %d\n", hr, returnedLength);
-			return;
-		}
-		*/
-		DbgPrint("!!! FSFilter: New Process, parent: %wZ, %d. Pid: %d\n", parentName, parentName->Length, (ULONG)(ULONG_PTR)ParentId);
-		//RtlZeroBytes(ParentUnicodeString.Buffer + (ParentUnicodeString.Length / 2), 2);
-		/*WCHAR buff2[MAX_FILE_NAME_LENGTH];
-		RtlZeroBytes(buff2, MAX_FILE_NAME_SIZE);
-		UNICODE_STRING ProcessImageName;
-		ProcessImageName.Buffer = buff2;
-		ProcessImageName.Length = 0;
-		ProcessImageName.MaximumLength = MAX_FILE_NAME_SIZE;
-		ASSERT(procHandleProcess != NULL);
-		hr = ZwQueryInformationProcess(procHandleProcess,
-			ProcessImageFileName,
-			&ProcessImageName,
-			MAX_FILE_NAME_SIZE,
-			&returnedLength);
+		DbgPrint("!!! FSFilter: New Process, parent: %wZ. Pid: %d\n", parentName, (ULONG)(ULONG_PTR)ParentId);
 
-		if (!NT_SUCCESS(hr)) {
-			DbgPrint("!!! FSFilter: Failed to get process name: %#010x. return length: %d\n", hr, returnedLength);
-			return;
-		}*/
 		hr = ZwClose(procHandleParent);
 		if (!NT_SUCCESS(hr)) {
 			DbgPrint("!!! FSFilter: Failed to close process: %#010x.\n", hr);
@@ -1260,15 +1149,20 @@ VOID AddRemProcessRoutine(
 			DbgPrint("!!! FSFilter: Failed to close process: %#010x.\n", hr);
 			return;
 		}
-		//buff2[ProcessImageName.Length / 2 + 1] = L'\0';
-		DbgPrint("!!! FSFilter: New Process, process: %wZ,  %d , pid: %d.\n", procName, procName->Length, (ULONG)(ULONG_PTR)ProcessId);
-		//DbgPrint("!!! FSFilter: New Process, process: %d , pid: %d. return length: %d\n", ProcessImageName.Length, (ULONG)(ULONG_PTR)ProcessId, returnedLength);
+		DbgPrint("!!! FSFilter: New Process, process: %wZ , pid: %d.\n", procName, (ULONG)(ULONG_PTR)ProcessId);
 
-		//crash with 
-		if (startsWith(procName, driverData->GetSystemRootPath()) && startsWith(parentName, driverData->GetSystemRootPath())) {
+		//crash with
+		BOOLEAN found = FALSE;
+		if (startsWith(procName, driverData->GetSystemRootPath()) && // process in safe area
+			startsWith(parentName, driverData->GetSystemRootPath()) && // parent in safe area
+			(driverData->GetProcessGid((ULONG)(ULONG_PTR)ParentId, &found) == 0) && !found) // parent is not documented, if it was there was a recursive call from not safe process which resulted in safe are in windows dir 
+		{
 			DbgPrint("!!! FSFilter: Open Process not recorded, both parent and process are safe\n");
+			delete parentName;
+			delete procName;
 			return;
 		}
+		// options to reach: process is not safe (parent safe or not), process safe parent is not, both safe but before parent there was unsafe process
 		DbgPrint("!!! FSFilter: Open Process recording, is parent safe: %d, is process safe: %d\n", startsWith(procName, driverData->GetSystemRootPath()), startsWith(parentName, driverData->GetSystemRootPath()));
 		driverData->RecordNewProcess(procName, (ULONG)(ULONG_PTR)ProcessId, (ULONG)(ULONG_PTR)ParentId);
 		delete parentName;

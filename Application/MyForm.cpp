@@ -110,7 +110,7 @@ HRESULT AntiRansomWareApp::MyForm::RemoveFilterDirectory(String ^ directory)
 	DWORD retSize;
 	setDirMsg.type = MESSAGE_REM_SCAN_DIRECTORY;
 	setDirMsg.pid = GetCurrentProcessId();
-
+	setDirMsg.gid = 0;
 	pin_ptr<const wchar_t> wch = PtrToStringChars(directory);
 	std::wstring Path(wch);
 	wcsncpy_s(setDirMsg.path, MAX_FILE_NAME_LENGTH, Path.c_str(), MAX_FILE_NAME_LENGTH);
@@ -144,14 +144,15 @@ HRESULT AntiRansomWareApp::MyForm::AddFilterDirectory(String ^ directory)
 	DWORD retSize;
 	setDirMsg.type = MESSAGE_ADD_SCAN_DIRECTORY;
 	setDirMsg.pid = GetCurrentProcessId();
+	setDirMsg.gid = 0;
 
 	pin_ptr<const wchar_t> wch = PtrToStringChars(directory);
 	std::wstring Path(wch);
 	wcsncpy_s(setDirMsg.path, MAX_FILE_NAME_LENGTH, Path.c_str(), MAX_FILE_NAME_LENGTH);
-
+	
 	HRESULT hr = FilterSendMessage(context.Port, &setDirMsg, sizeof(COM_MESSAGE), &retOp, 1, &retSize);
 	if (FAILED(hr)) {
-		DBOUT("Failed to send add pid message" << std::endl);
+		DBOUT("Failed to send set dir message" << std::endl);
 		Globals::Instance->setCommCloseStat(TRUE);
 		return S_FALSE;
 	}

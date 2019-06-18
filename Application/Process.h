@@ -9,8 +9,9 @@ using namespace System;
 #include "Traps.h"
 #include "Thresholds.h"
 
-ref class ProcessRecord {
-	ULONG pid;
+ref class GProcessRecord {
+	ULONGLONG gid; // FIXME: add to report
+	Generic::SortedSet<ULONG>^ Pids; // FIXME: add to report with comment
 	BOOLEAN malicious;
 	BOOLEAN killed;
 	BOOLEAN safeProcess;
@@ -96,8 +97,9 @@ ref class ProcessRecord {
 	return 0;
 	}
 
-	public: ProcessRecord() {
-		pid = 0;
+	public: GProcessRecord() {
+		gid = 0;
+		Pids = gcnew Generic::SortedSet<ULONG>;
 		appName = nullptr;
 		malicious = FALSE;
 		killed = FALSE;
@@ -151,12 +153,14 @@ ref class ProcessRecord {
 		highEntropyWrites = 0;
 
 	}
-	public: ProcessRecord(ULONG PID) {
-		pid = PID;
+	public: GProcessRecord(ULONGLONG GID, ULONG Pid) {
+		gid = GID;
+		Pids = gcnew Generic::SortedSet<ULONG>;
+		Pids->Add(Pid);
 		appName = nullptr;
 		HANDLE h = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ,
 			FALSE,
-			PID);
+			Pid);
 		if (nullptr == h)
 		{
 			DBOUT("OpenProcess() failed: " << GetLastError() << "\n");
@@ -243,7 +247,9 @@ ref class ProcessRecord {
 		System::String^ newMsg = "Recieved an irp: ";
 		newMsg = System::String::Concat(newMsg, gcnew String(IRP_TO_STRING(Irp.IRP_OP)), " From process id: ", Irp.PID.ToString(), " AppName: ", appName, System::Environment::NewLine);
 		Globals::Instance->postLogMessage(newMsg, VERBOSE_ONLY);
-
+		
+		Pids->Add(Irp.PID);
+		
 		if (safeProcess) {
 			DBOUT("Safe process, skipping " << std::endl);
 			return TRUE;
@@ -503,10 +509,16 @@ ref class ProcessRecord {
 	public: VOID setKilled() {
 		killed = TRUE;
 	}
-
+	
 	// assumes that caller protect this call
-	public: ULONG Pid() {
-		return pid;
+	public: ULONGLONG Gid() {
+		return gid;
+	}
+			// assumes that caller protect this call
+	public: Generic::SortedSet<ULONG>^ pids() {
+		Generic::SortedSet<ULONG>^ ret = gcnew Generic::SortedSet<ULONG>;
+		ret->UnionWith(Pids);
+		return ret;
 	}
 	// assumes that caller protect this call
 	public: String^ Name() {
@@ -745,12 +757,12 @@ ref class ProcessesMemory {
 public:
 	ProcessesMemory() {
 		// pid to record
-		Processes = gcnew Concurrent::ConcurrentDictionary<ULONG, ProcessRecord^>;
+		Processes = gcnew Concurrent::ConcurrentDictionary<ULONGLONG, GProcessRecord^>;
 	}
 private:
 	ProcessesMemory(const ProcessesMemory%) { throw gcnew System::InvalidOperationException("ApplicationsMemory cannot be copy-constructed"); }
 	// TODO: add serialize and deserialize of those containers
-public: Concurrent::ConcurrentDictionary<DWORD, ProcessRecord^>^ Processes;
+public: Concurrent::ConcurrentDictionary<ULONGLONG, GProcessRecord^>^ Processes;
 public:
 	static property ProcessesMemory^ Instance
 	{

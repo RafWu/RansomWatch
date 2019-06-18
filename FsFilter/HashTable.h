@@ -47,7 +47,7 @@ public:
 		//Initial capacity of hash array 
 		capacity = 100;
 		size = 0;
-
+		
 		//Initialise all elements of array as NULL 
 		for (ULONGLONG i = 0; i < capacity; i++) {
 			arr[i] = new LIST_ENTRY;
@@ -56,7 +56,7 @@ public:
 	}
 	~HashMap() {
 		for (ULONGLONG i = 0; i < capacity; i++) {
-			delete arr[i];
+			delete (arr[i]);
 		}
 	}
 	// This implements hash function to find index 

@@ -5,6 +5,7 @@
 #include "Common.h"
 #include "TrapHandler.h"
 #include "FilterWorker.h"
+#include "BackupService.h"
 
 #pragma comment(lib, "fltMgr")
 #pragma comment(lib, "fltLib")
@@ -32,6 +33,7 @@ namespace AntiRansomWareApp {
 	private: BOOLEAN dragging;
 	private: Point offset;
 	private: TrapHandler* trapHandler;
+	private: BackupService^ service;
 	private: System::Windows::Forms::CheckBox^  AutoKill;
 	private: System::Windows::Forms::CheckBox^  ViewLog;
 	private: System::Windows::Forms::CheckBox^  DisableProtection;
@@ -70,7 +72,7 @@ namespace AntiRansomWareApp {
 			context.Port = nullptr;
 			Globals::Instance->setTextBox(logViewer);
 			openKernelCommunication();
-
+			service = gcnew BackupService(); // FIXME: catch throw backup service
 			trapHandler = new TrapHandler(); // FIXME: protect catch throw
 			if (trapHandler == nullptr) {
 				throw "aa";
@@ -367,11 +369,20 @@ private: System::Void SelectAddRootDir_Click(System::Object^  sender, System::Ev
 			String^ logMsg = String::Concat(logHead, selectedDir, System::Environment::NewLine);
 			Globals::Instance->postLogMessage(logMsg, PRIORITY_PRINT);
 
+			if (service->SnapshotDirectory(selectedDir)) {
+				Globals::Instance->postLogMessage(String::Concat("<I> Snapshot directory: ", selectedDir, " successfully", System::Environment::NewLine), PRIORITY_PRINT);
+			}
+			else {
+				Globals::Instance->postLogMessage(String::Concat("<E> Snapshot directory: ", selectedDir, " failed", System::Environment::NewLine), PRIORITY_PRINT);
+			}
+
 			if (Globals::Instance->getCommCloseStat() || context.Port == nullptr) { // no comm
 				Globals::Instance->postLogMessage(String::Concat("<E> Comm closed", System::Environment::NewLine), PRIORITY_PRINT);
 				return;
 			}
+			
 			// handle traps
+
 			trapHandler->initDirTraps(selectedDir);
 
 			// do add dir message

@@ -201,50 +201,71 @@ NTSTATUS AMFNewMessage(
 		return STATUS_INVALID_PARAMETER;
 		
 	}
-	else if (message->type == MESSAGE_KILL_PID) {
-		NTSTATUS status = STATUS_SUCCESS;
-		HANDLE processHandle;
-		ULONG PID = message->pid;
-
-		/* following code may be wrong*/
-		CLIENT_ID clientId;
-		clientId.UniqueProcess = &PID;
-		clientId.UniqueThread = &PID;
-
-		OBJECT_ATTRIBUTES objAttribs;
-		NTSTATUS exitStatus = STATUS_FAIL_CHECK;
-		
+	// FIXME: the kill code to gid
+	else if (message->type == MESSAGE_KILL_GID) {
 		if (OutputBuffer == NULL || OutputBufferLength != sizeof(LONG)) {
 			return STATUS_INVALID_PARAMETER;
 		}
-
 		*ReturnOutputBufferLength = sizeof(LONG);
-
-		InitializeObjectAttributes(&objAttribs,
-			NULL,
-			OBJ_KERNEL_HANDLE,
-			NULL,
-			NULL);
-
-		status = ZwOpenProcess(&processHandle,
-				PROCESS_ALL_ACCESS,
-				&objAttribs,
-				&clientId);
-		if (!NT_SUCCESS(status)) {
-			*((PLONG)OutputBuffer) = status; // fail
-			DbgPrint("!!! FS : Failed to open process %d, reason: %d\n", PID, status);
-			return STATUS_SUCCESS; // we dont fail code we notify back a failure
+		NTSTATUS status = STATUS_SUCCESS;
+		HANDLE processHandle;
+		ULONGLONG GID = message->gid;
+		BOOLEAN isGidExist = FALSE;
+		ULONGLONG gidSize = driverData->GetGidSize(GID, &isGidExist);
+		if (gidSize == 0 || isGidExist == FALSE) {
+			DbgPrint("!!! FS : Gid already ended or no such gid %d\n", GID);
+			*((PLONG)OutputBuffer) = STATUS_NO_SUCH_GROUP; // fail to kill process
+			return STATUS_SUCCESS;
 		}
-		
-		status = ZwTerminateProcess(processHandle, exitStatus);
-		if (NT_SUCCESS(status)) {
-			*((PLONG)OutputBuffer) = status; // success we can close handle
-			status = NtClose(processHandle);
-			return status; // we dont fail code we notify back a failure
+		// there is gid with processes
+		PULONG Buffer = (PULONG)ExAllocatePoolWithTag(NonPagedPool, sizeof(ULONG) * gidSize, 'RW');
+		if (Buffer == nullptr) {
+			DbgPrint("!!! FS : memory allocation error on non paged pool\n");
+			*((PLONG)OutputBuffer) = STATUS_MEMORY_NOT_ALLOCATED; // fail to kill process
+			return STATUS_SUCCESS;
 		}
-		DbgPrint("!!! FS : Failed to kill process %d, reason: %d\n", PID, status);
-		*((PLONG)OutputBuffer) = status; // fail to kill process
-		NtClose(processHandle);
+		ULONGLONG pidsReturned = 0;
+		isGidExist = driverData->GetGidPids(GID, Buffer, gidSize, &pidsReturned);
+		if (isGidExist) { // got all irps and correct size
+			for (int i = 0; i < gidSize; i++) { // kill each process
+				CLIENT_ID clientId;
+				clientId.UniqueProcess = (HANDLE)Buffer[i];
+				clientId.UniqueThread = 0;
+				
+				OBJECT_ATTRIBUTES objAttribs;
+				NTSTATUS exitStatus = STATUS_FAIL_CHECK;
+				
+				DbgPrint("!!! FS : Attempt to terminate pid: %d from gid: %d\n", Buffer[i], GID);
+
+				InitializeObjectAttributes(&objAttribs,
+					NULL,
+					OBJ_KERNEL_HANDLE,
+					NULL,
+					NULL);
+
+				status = ZwOpenProcess(&processHandle,
+					PROCESS_ALL_ACCESS,
+					&objAttribs,
+					&clientId);
+
+				if (!NT_SUCCESS(status)) {
+					*((PLONG)OutputBuffer) = STATUS_FAIL_CHECK; // fail
+					DbgPrint("!!! FS : Failed to open process %d, reason: %d\n", Buffer[i], status);
+					continue; // try to kill others
+				}
+				status = ZwTerminateProcess(processHandle, exitStatus);
+				if (!NT_SUCCESS(status)) {
+					*((PLONG)OutputBuffer) = STATUS_FAIL_CHECK; // fail
+					DbgPrint("!!! FS : Failed to kill process %d, reason: %d\n", Buffer[i], status);
+					status = NtClose(processHandle);
+					continue; // try to kill others
+				}	
+				NtClose(processHandle);
+
+				DbgPrint("!!! FS : Termination of pid: %d from gid: %d succeeded\n", Buffer[i], GID);
+			}
+		}
+		ExFreePoolWithTag(Buffer, 'RW');
 		return STATUS_SUCCESS;
 	}
 

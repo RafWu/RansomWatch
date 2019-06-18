@@ -32,10 +32,11 @@ Return Value
 	GetIrpMsg.type = MESSAGE_GET_OPS;
 	GetIrpMsg.pid = GetCurrentProcessId();
 	GetIrpMsg.path[0] = L'\0';
+	GetIrpMsg.gid = 0;
 	
-
+	// FIXME
 	while (!Globals::Instance->getCommCloseStat()) { // while communication open
-		std::set<ULONG> pidsCheck;
+		std::set<ULONGLONG> gidsCheck;
 		DWORD ReplySize;
 		ULONGLONG numOps = 0;
 		hr = FilterSendMessage(Port, &GetIrpMsg, sizeof(COM_MESSAGE), Buffer, BufferSize, &ReplySize);
@@ -67,7 +68,7 @@ Return Value
 			if (hr != S_OK) {
 				Globals::Instance->postLogMessage(String::Concat("Failed to handle irp msg", System::Environment::NewLine), VERBOSE_ONLY);
 			}
-			pidsCheck.insert(pMsgIrp->PID);
+			gidsCheck.insert(pMsgIrp->Gid);
 			if (Globals::Instance->Verbose()) {
 				if (pMsgIrp->filePath.Length) {
 					std::wstring fileNameStr(pMsgIrp->filePath.Buffer, pMsgIrp->filePath.Length / 2);
@@ -86,8 +87,8 @@ Return Value
 		Globals::Instance->addIrpHandled(numOps);
 
 		// check Malicious, handle in that case
-		for (ULONG pid : pidsCheck) {
-			CheckHandleMaliciousApplication(pid, Port);
+		for (ULONGLONG gid : gidsCheck) {
+			CheckHandleMaliciousApplication(gid, Port);
 		}
 
 		Globals::Instance->postLogMessage(String::Concat("... Finished handling irp requests, requesting", System::Environment::NewLine), VERBOSE_ONLY);
@@ -97,18 +98,19 @@ Return Value
 }
 
 HRESULT ProcessIrp(CONST DRIVER_MESSAGE& msg) {
-	ULONG IrpPid = msg.PID;
-	ProcessRecord^ record;
-	if (ProcessesMemory::Instance->Processes->TryGetValue(IrpPid, record)) { // val found
+	ULONGLONG gid = msg.Gid;
+	ULONG pid = msg.PID;
+	GProcessRecord^ record;
+	if (ProcessesMemory::Instance->Processes->TryGetValue(gid, record)) { // val found
 		if (record == nullptr) { // found pid but no process record/ shouldnt happen
 			return S_FALSE;
 		}
 		record->AddIrpRecord(msg);
 		return S_OK;
 	}
-	record = gcnew ProcessRecord(IrpPid);
-	if (!ProcessesMemory::Instance->Processes->TryAdd(IrpPid, record)) { // add failed
-		if (ProcessesMemory::Instance->Processes->TryGetValue(IrpPid, record)) { // val found
+	record = gcnew GProcessRecord(gid, pid);
+	if (!ProcessesMemory::Instance->Processes->TryAdd(gid, record)) { // add failed
+		if (ProcessesMemory::Instance->Processes->TryGetValue(gid, record)) { // val found
 			record->AddIrpRecord(msg);
 			return S_OK;
 		}
@@ -128,21 +130,21 @@ HRESULT ProcessIrp(CONST DRIVER_MESSAGE& msg) {
 
 
 
-VOID HandleMaliciousApplication(ProcessRecord^ record, HANDLE comPort) {
+VOID HandleMaliciousApplication(GProcessRecord^ record, HANDLE comPort) {
 	if (record != nullptr) {
-		ULONG pid = record->Pid();
-		String^ pidStr = pid.ToString();
+		ULONGLONG gid = record->Gid();
+		String^ gidStr = gid.ToString();
 		String^ appName = record->Name();
-		DWORD failReason = 0; 
-		BOOLEAN isTerminateSuc;
-		DWORD isKilled;
-		Globals::Instance->postLogMessage(String::Concat("Handling malicious application: ", appName, " with pid: ", pidStr, System::Environment::NewLine), PRIORITY_PRINT);
+		//DWORD failReason = 0; 
+		//BOOLEAN isTerminateSuc;
+		//DWORD isKilled;
+		Globals::Instance->postLogMessage(String::Concat("Handling malicious application: ", appName, " with RansomWatch gid: ", gidStr, System::Environment::NewLine), PRIORITY_PRINT);
 		if (Globals::Instance->getKillStat()) {
-			Globals::Instance->postLogMessage(String::Concat("Attempt to kill process using application", System::Environment::NewLine), PRIORITY_PRINT);
+			Globals::Instance->postLogMessage(String::Concat("Attempt to kill processes using driver", System::Environment::NewLine), PRIORITY_PRINT);
 			Monitor::Enter(record);
 			if (record->isMalicious() && !record->isKilled())
 			{
-				HANDLE pHandle = OpenProcess(PROCESS_TERMINATE | SYNCHRONIZE, false, pid);
+				/*HANDLE pHandle = OpenProcess(PROCESS_TERMINATE | SYNCHRONIZE, false, pid);
 				if (pHandle != nullptr)
 				{
 					isTerminateSuc = TerminateProcess(pHandle, 1); // exit with failure
@@ -173,31 +175,32 @@ VOID HandleMaliciousApplication(ProcessRecord^ record, HANDLE comPort) {
 					failedOn = gcnew String(" Failed Terminate process");
 				}
 				Globals::Instance->postLogMessage(String::Concat("Failed to kill process using application, using driver to kill. error code: ", failReason.ToString(), failedOn, System::Environment::NewLine), PRIORITY_PRINT);
+				*/
 				COM_MESSAGE killPidMsg;
 				NTSTATUS retOp = S_OK;
 				DWORD retSize;
-				killPidMsg.type = MESSAGE_KILL_PID;
-				killPidMsg.pid = pid;
-				Monitor::Enter(record);
-				if (!record->isKilled()) {
-					HRESULT hr = FilterSendMessage(comPort, &killPidMsg, sizeof(COM_MESSAGE), &retOp, sizeof(NTSTATUS), &retSize);
-					if (SUCCEEDED(hr) && retOp == S_OK) {
-						record->setKilled();
-					}
-					Monitor::Exit(record);
-					if (FAILED(hr)) {
-						DBOUT("Failed to send kill pid message" << std::endl);
-						Globals::Instance->setCommCloseStat(TRUE);
-					}
+				killPidMsg.type = MESSAGE_KILL_GID;
+				killPidMsg.gid = gid;
+				//Monitor::Enter(record);
+				//if (!record->isKilled()) {
+				HRESULT hr = FilterSendMessage(comPort, &killPidMsg, sizeof(COM_MESSAGE), &retOp, sizeof(NTSTATUS), &retSize);
+				if (SUCCEEDED(hr) && retOp != E_ACCESSDENIED) {
+					record->setKilled();
+				}
+				Monitor::Exit(record);
+				if (FAILED(hr)) {
+					DBOUT("Failed to send kill gid message" << std::endl);
+					Globals::Instance->setCommCloseStat(TRUE);
+				}
 
-					if (FAILED(hr) || retOp != S_OK) {
-						Globals::Instance->postLogMessage(String::Concat("Failed to kill process using driver, pid: ", pidStr, System::Environment::NewLine), PRIORITY_PRINT);
-					}
+				if (FAILED(hr) || retOp != S_OK) {
+					Globals::Instance->postLogMessage(String::Concat("Failed to kill process using driver, gid: ", gidStr, System::Environment::NewLine), PRIORITY_PRINT);
 				}
-				else {
-					Monitor::Exit(record);
-					DBOUT("Process already killed" << std::endl);
-				}
+				//}
+				//else {
+				//	Monitor::Exit(record);
+				//	DBOUT("Process already killed" << std::endl);
+				//}
 			}
 			else {
 				Monitor::Exit(record);
@@ -205,20 +208,20 @@ VOID HandleMaliciousApplication(ProcessRecord^ record, HANDLE comPort) {
 			}
 		}
 		else {
-			Globals::Instance->postLogMessage(String::Concat("Auto kill disabled, reporting process: ", appName, "with pid: ", pidStr, System::Environment::NewLine), PRIORITY_PRINT);
+			Globals::Instance->postLogMessage(String::Concat("Auto kill disabled, reporting process: ", appName, "with gid: ", gidStr, System::Environment::NewLine), PRIORITY_PRINT);
 			pin_ptr<const wchar_t> content = PtrToStringChars(appName);
 			std::wstring result(content, appName->Length);
-			std::wstring pidStrStd = std::to_wstring(pid);
-			std::wstring msg = result + L" malicious with pid: " + pidStrStd;
+			std::wstring gidStrStd = std::to_wstring(gid);
+			std::wstring msg = result + L" malicious with RansomWatch gid: " + gidStrStd;
 			MessageBox(NULL, L"Malicious Application", msg.c_str(), MB_OK);
 		}
 		
 	}
 }
 
-VOID CheckHandleMaliciousApplication(ULONG pid, HANDLE comPort) {
-	ProcessRecord^ record = nullptr;
-	if (ProcessesMemory::Instance->Processes->TryGetValue(pid, record) && record != nullptr) {
+VOID CheckHandleMaliciousApplication(ULONGLONG gid, HANDLE comPort) {
+	GProcessRecord^ record = nullptr;
+	if (ProcessesMemory::Instance->Processes->TryGetValue(gid, record) && record != nullptr) {
 		if (record->isSafe()) {
 			DBOUT("Safe process skipping malicious check" << std::endl);
 			return;
@@ -227,9 +230,10 @@ VOID CheckHandleMaliciousApplication(ULONG pid, HANDLE comPort) {
 			Globals::Instance->postLogMessage(String::Concat("Found malicious application", System::Environment::NewLine), PRIORITY_PRINT);
 			Generic::SortedSet<String^>^ triggersDetected = record->GetTriggersBreached();
 			String^ msg = gcnew String("Breached triggers: ");
-			for each (String ^ trigger in triggersDetected) {
-				msg = String::Concat(msg, trigger, " ");
-			}
+			//for each (String ^ trigger in triggersDetected) {
+			//	msg = String::Concat(msg, trigger, ", ");
+			//}
+			msg = String::Concat(msg,String::Join(", ", triggersDetected));
 			msg = String::Concat(msg, System::Environment::NewLine);
 			Globals::Instance->postLogMessage(msg, PRIORITY_PRINT);
 
@@ -237,11 +241,11 @@ VOID CheckHandleMaliciousApplication(ULONG pid, HANDLE comPort) {
 
 			Generic::SortedSet<String^>^ createdFiles = record->GetCreatedFiles();
 			Generic::SortedSet<String^>^ changedFiles = record->GetChangedFiles();
-			String^ reportFile = String::Concat("C:\\Report", record->Pid().ToString(), ".log");
+			String^ reportFile = String::Concat("C:\\Report", record->Gid().ToString(), ".log");
 			try {
 				StreamWriter^ sw = gcnew StreamWriter(reportFile);
 				sw->WriteLine("RansomWatch report file");
-				sw->Write("Files report for ransomware running from exe: ");
+				sw->Write("Files report for ransomware running from exe: "); // FIXME: on kill message return image files paths and report
 				sw->WriteLine(record->Name());
 				sw->Write("Process started on time: ");
 				sw->WriteLine(record->Date());

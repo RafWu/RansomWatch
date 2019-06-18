@@ -3,7 +3,7 @@
 #include <fltKernel.h>
 #include "../SharedDefs/SharedDefs.h"
 
-//#define DEBUG_IRP
+#define DEBUG_IRP
 #ifdef DEBUG_IRP
 #define IS_DEBUG_IRP 1
 #else
@@ -45,7 +45,11 @@ typedef struct _PID_ENTRY {
 typedef struct _DIRECTORY_ENTRY {
 	LIST_ENTRY entry;
 	WCHAR path[MAX_FILE_NAME_LENGTH];
-	
+	_DIRECTORY_ENTRY() {
+		InitializeListHead(&entry);
+		path[0] = L'\0';
+	}
+
 } DIRECTORY_ENTRY, *PDIRECTORY_ENTRY;
 
 typedef struct _IRP_ENTRY {
@@ -92,3 +96,40 @@ NTSTATUS CopyWString(LPWSTR dest, LPCWSTR source, size_t size);
 WCHAR* stristr(const WCHAR* String, const WCHAR* Pattern);
 
 BOOLEAN startsWith(PUNICODE_STRING String, PWCHAR Pattern);
+
+struct GID_ENTRY {
+	LIST_ENTRY GidListEntry;
+	ULONGLONG gid;
+	ULONGLONG pidsSize;
+	LIST_ENTRY HeadListPids;
+
+	// gid as input
+	GID_ENTRY(ULONGLONG Gid) {
+		gid = Gid;
+		InitializeListHead(&HeadListPids);
+		InitializeListHead(&GidListEntry);
+		pidsSize = 0;
+	}
+
+	//copy
+	GID_ENTRY(const GID_ENTRY& a) {
+		HeadListPids.Flink = a.HeadListPids.Flink;
+		HeadListPids.Blink = a.HeadListPids.Blink;
+		GidListEntry.Flink = a.GidListEntry.Flink;
+		GidListEntry.Blink = a.GidListEntry.Blink;
+		gid = a.gid;
+		pidsSize = a.pidsSize;
+	}
+
+	const GID_ENTRY& operator=(const GID_ENTRY& a) {
+		HeadListPids.Flink = a.HeadListPids.Flink;
+		HeadListPids.Blink = a.HeadListPids.Blink;
+		GidListEntry.Flink = a.GidListEntry.Flink;
+		GidListEntry.Blink = a.GidListEntry.Blink;
+		gid = a.gid;
+		pidsSize = a.pidsSize;
+		this;
+	}
+};
+
+typedef GID_ENTRY* PGID_ENTRY;
