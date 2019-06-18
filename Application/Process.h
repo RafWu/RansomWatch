@@ -475,7 +475,7 @@ ref class GProcessRecord {
 			fileIdsChecked->Add(newId);
 			if (isTrap) {
 				trapsRead++;
-				fileIdsTraps->Add(newId); // TODO: remove overkill
+				//fileIdsTraps->Add(newId); // TODO: remove overkill
 				dirsTrapsActions->Add(TrapsMemory::Instance->fileIdToTrapRecord[newId]->getDirectory());
 			}
 		}

@@ -3,7 +3,7 @@
 #include <fltKernel.h>
 #include "../SharedDefs/SharedDefs.h"
 
-#define DEBUG_IRP
+//#define DEBUG_IRP
 #ifdef DEBUG_IRP
 #define IS_DEBUG_IRP 1
 #else
@@ -28,7 +28,8 @@ typedef struct _PID_ENTRY {
 	void* _PID_ENTRY::operator new(size_t size)
 	{
 		void* ptr = ExAllocatePoolWithTag(NonPagedPool, size, 'RW');
-		memset(ptr, 0, size);
+		if (size && ptr != nullptr)
+			memset(ptr, 0, size);
 		return ptr;
 	}
 
@@ -74,7 +75,8 @@ typedef struct _IRP_ENTRY {
 	void* _IRP_ENTRY::operator new(size_t size)
 	{
 		void* ptr = ExAllocatePoolWithTag(NonPagedPool, size, 'RW');
-		memset(ptr, 0, size);
+		if (size && ptr != nullptr)
+			memset(ptr, 0, size);
 		return ptr;
 	}
 

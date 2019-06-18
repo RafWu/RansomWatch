@@ -53,7 +53,7 @@ namespace AntiRansomWareApp {
 	private: HRESULT AddFilterDirectory(String^ directory);
 	private: HRESULT RemoveFilterDirectory(String^ directory);
 	private: void closeKernelDriverCom();
-	private: void openKernelCommunication();
+	private: BOOLEAN openKernelCommunication();
 	private: System::Windows::Forms::Button^  Exit;
 	private: System::Windows::Forms::Button^ MinimizeButton;
 
@@ -71,11 +71,27 @@ namespace AntiRansomWareApp {
 			this->MinimizeButton->Image = (cli::safe_cast<Drawing::Bitmap^>(s_pxResourceManager->GetObject("min")));
 			context.Port = nullptr;
 			Globals::Instance->setTextBox(logViewer);
-			openKernelCommunication();
-			service = gcnew BackupService(); // FIXME: catch throw backup service
-			trapHandler = new TrapHandler(); // FIXME: protect catch throw
-			if (trapHandler == nullptr) {
-				throw "aa";
+			
+			if (!openKernelCommunication()) { // fail to open communication
+				String^ strMessage = String::Concat("<E> Failed to open communication with driver", System::Environment::NewLine);
+				String^ caption = "Driver connection error";
+				//Globals::Instance->postLogMessage(strMessage, PRIORITY_PRINT);
+				System::Windows::Forms::MessageBoxButtons buttons = System::Windows::Forms::MessageBoxButtons::OK;
+				System::Windows::Forms::MessageBox::Show(strMessage, caption, buttons);
+				//throw "ApplicationFailStart";
+			}
+
+			try {
+				//service = gcnew BackupService(); // FIXME: catch throw backup service
+				trapHandler = new TrapHandler(); // FIXME: protect catch throw
+			}
+			catch (...) {
+				String^ strMessage = String::Concat("<E> Failed to start backup service or traps handler", System::Environment::NewLine);
+				String^ caption = "Application internal error";
+				//Globals::Instance->postLogMessage(strMessage, PRIORITY_PRINT);
+				System::Windows::Forms::MessageBoxButtons buttons = System::Windows::Forms::MessageBoxButtons::OK;
+				System::Windows::Forms::MessageBox::Show(strMessage, caption, buttons);
+				//throw "ApplicationFailStart";
 			}
 
 		}
@@ -346,7 +362,18 @@ private: System::Void SelectRemRootDir_Click(System::Object^  sender, System::Ev
 			// handle traps
 
 			trapHandler->remDirTraps(selectedDir);
+			/*
+			if (service->RemoveSnapshotDirectory(selectedDir)) {
+				Globals::Instance->postLogMessage(String::Concat("<I> Snapshot directory deleted: ", selectedDir, System::Environment::NewLine), PRIORITY_PRINT);
+			}
+			else {
+				Globals::Instance->postLogMessage(String::Concat("<E> Snapshot directory not deleted: ", selectedDir, System::Environment::NewLine), PRIORITY_PRINT);
+			}*/
 
+			if (Globals::Instance->getCommCloseStat() || context.Port == nullptr) { // no comm
+				Globals::Instance->postLogMessage(String::Concat("<E> Comm closed", System::Environment::NewLine), PRIORITY_PRINT);
+				return;
+			}
 		}
 	}
 }
@@ -368,13 +395,13 @@ private: System::Void SelectAddRootDir_Click(System::Object^  sender, System::Ev
 			String^ logHead = gcnew String("<I> Trying to add directory: ");
 			String^ logMsg = String::Concat(logHead, selectedDir, System::Environment::NewLine);
 			Globals::Instance->postLogMessage(logMsg, PRIORITY_PRINT);
-
+			/*
 			if (service->SnapshotDirectory(selectedDir)) {
 				Globals::Instance->postLogMessage(String::Concat("<I> Snapshot directory: ", selectedDir, " successfully", System::Environment::NewLine), PRIORITY_PRINT);
 			}
 			else {
 				Globals::Instance->postLogMessage(String::Concat("<E> Snapshot directory: ", selectedDir, " failed", System::Environment::NewLine), PRIORITY_PRINT);
-			}
+			}*/
 
 			if (Globals::Instance->getCommCloseStat() || context.Port == nullptr) { // no comm
 				Globals::Instance->postLogMessage(String::Concat("<E> Comm closed", System::Environment::NewLine), PRIORITY_PRINT);

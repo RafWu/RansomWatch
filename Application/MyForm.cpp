@@ -34,7 +34,7 @@ HRESULT AntiRansomWareApp::MyForm::initWorkThread() {
 	return hr;
 }
 
-void AntiRansomWareApp::MyForm::openKernelCommunication() {
+BOOLEAN AntiRansomWareApp::MyForm::openKernelCommunication() {
 	BOOLEAN openComDriver = openKernelDriverCom(); // if true com is open else false
 	//Globals::Instance->setCommCloseStat(!openComDriver);
 	if (openComDriver) {
@@ -56,7 +56,8 @@ void AntiRansomWareApp::MyForm::openKernelCommunication() {
 		// TODO: if fail driver cant work
 		if (!QueryDosDevice(Buffer, szNtDeviceName, MAX_PATH))
 		{
-			
+			Globals::Instance->setCommCloseStat(TRUE);
+			return FALSE;
 		}
 
 
@@ -70,7 +71,7 @@ void AntiRansomWareApp::MyForm::openKernelCommunication() {
 		if (FAILED(hr)) {
 			DBOUT("Failed to send set pid message, cancel kernel comm" << std::endl);
 			closeKernelDriverCom();
-			return;
+			return FALSE;
 		}
 
 		DBOUT("Kernel com init successfully, init listening threads" << std::endl);
@@ -81,11 +82,12 @@ void AntiRansomWareApp::MyForm::openKernelCommunication() {
 			DBOUT("Failed to create worker thread" << std::endl);
 			// FIXME: add exception, notify, close program
 		}
+		return TRUE;
 		
 	}
 	else {
 		DBOUT("Failed to open com port to the kernel driver, working without kernel attachment" << std::endl);
-		// FIXME: add exception, notify, close program
+		return FALSE;
 	}
 }
 

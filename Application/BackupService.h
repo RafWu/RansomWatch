@@ -41,7 +41,7 @@ public: BackupService() {
 		//String^ BlobPrefix = diSource->Name;
 
 		DateTime thisDate = DateTime::Now;
-		String^ date = thisDate.ToString("dd.mm.yy") + "/";
+		String^ date = thisDate.ToString("dd.MM.yy") + "/";
 
 		Generic::List<TrapRecord^>^ listTrapsRecords = nullptr;
 
@@ -60,9 +60,13 @@ public: BackupService() {
 				}
 			}
 			if (!isFileTrap) {
-				String^ upFileName = fi->FullName->Substring(3)->Replace('\\', '/')->Insert(0, date);
+				String^ upFileName = fi->FullName->Replace('\\', '/');
 				CloudBlockBlob^ blob = container->GetBlockBlobReference(upFileName);
+				bool exist = blob->ExistsAsync()->Result;
+				if (exist)
+					blob->CreateSnapshotAsync()->Wait();
 				blob->UploadFromFileAsync(fi->FullName);
+				
 			}
 		}
 		for each (DirectoryInfo ^ di in diSource->GetDirectories()) {
@@ -74,6 +78,36 @@ public: BackupService() {
 		return TRUE;
 	}
 
+	public: BOOLEAN RemoveSnapshotDirectory(String^ dirPath) {
+		if (dirPath == nullptr) return FALSE;
+		String^ blobDirName = dirPath->Substring(3)->Replace('\\', '/'); // now in blob format
+		CloudBlockBlob^ blob;
+		BlobContinuationToken^ blobContinuationToken = nullptr;
+		do
+		{
+			Microsoft::WindowsAzure::Storage::Blob::BlobResultSegment^ result = (container->ListBlobsSegmented(nullptr, blobContinuationToken));
+			// Get the value of the continuation token returned by the listing call.
+
+			blobContinuationToken = result->ContinuationToken;
+			for each(IListBlobItem^ item in result->Results)
+			{
+				Globals::Instance->postLogMessage(blobDirName + System::Environment::NewLine, PRIORITY_PRINT);
+				Globals::Instance->postLogMessage(item->Uri->LocalPath + System::Environment::NewLine, PRIORITY_PRINT);
+				if (item->ToString()->Contains(blobDirName)) {
+					CloudBlockBlob^ blob = container->GetBlockBlobReference(item->Uri->LocalPath);
+					
+					/*BlobContinuationToken^ blobContinuationToken = nullptr;
+					do
+					{
+						Microsoft::WindowsAzure::Storage::Blob::BlobResultSegment^ result = (container->ListBlobsSegmented(nullptr, blobContinuationToken));
+					} while (blobContinuationToken != nullptr); // Loop while the continuation token is not null.
+					*/
+				}
+			}
+		} while (blobContinuationToken != nullptr); // Loop while the continuation token is not null.
+		return TRUE;
+	}
+	
 
 };
 

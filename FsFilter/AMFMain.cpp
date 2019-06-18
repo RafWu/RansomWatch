@@ -24,8 +24,8 @@ EXTERN_C_START
 
 NTSTATUS
 DriverEntry(
-	_In_ PDRIVER_OBJECT DriverObject,
-	_In_ PUNICODE_STRING RegistryPath
+	PDRIVER_OBJECT DriverObject,
+	PUNICODE_STRING RegistryPath
 );
 
 DRIVER_INITIALIZE DriverEntry;
@@ -77,8 +77,8 @@ CONST FLT_REGISTRATION FilterRegistration = {
 
 NTSTATUS
 DriverEntry(
-	_In_ PDRIVER_OBJECT DriverObject,
-	_In_ PUNICODE_STRING RegistryPath
+	PDRIVER_OBJECT DriverObject,
+	PUNICODE_STRING RegistryPath
 )
 /*++
 
