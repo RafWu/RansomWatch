@@ -4,7 +4,8 @@ using namespace System;
 using namespace System::Collections;
 using namespace System::Threading;
 
-#include "Common.h"
+//#include "Common.h"
+#include "FileId.h"
 
 ref struct TrapRecord {
 	FileId fileId; //we represent as string due to size changes, minimum of 128 bits in current systems

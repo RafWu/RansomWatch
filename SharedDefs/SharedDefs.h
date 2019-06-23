@@ -14,13 +14,11 @@ Environment :
 
 --*/
 
-#include "Common.h"
-
 //
 //  Name of port used to communicate
 //
 
-const PWSTR ComPortName = L"\\AMFilter";
+const PWSTR ComPortName = L"\\RWFilter";
 
 #define MAX_FILE_NAME_LENGTH 520
 #define MAX_FILE_NAME_SIZE (MAX_FILE_NAME_LENGTH * sizeof(WCHAR))
@@ -103,13 +101,13 @@ typedef struct _AMF_IRP_OP {
 } AMF_IRP_OP, PAMF_IRP_OP;
 */
 
-typedef struct _AMF_REPLY_IRPS {
+typedef struct _RWD_REPLY_IRPS {
 	size_t dataSize; // 8 bytes
 	PDRIVER_MESSAGE data; // 8 bytes points to the first IRP driver message, the next DRIVER_MESSAGE is a pointer inside DRIVER_MESSAGE
 	ULONGLONG num_ops; // 8 bytes
 	
 	size_t size() {
-		return dataSize + sizeof(AMF_REPLY_IRPS);
+		return dataSize + sizeof(_RWD_REPLY_IRPS);
 	}
 	size_t addSize(size_t size) {
 		dataSize += size;
@@ -122,9 +120,9 @@ typedef struct _AMF_REPLY_IRPS {
 	ULONGLONG numOps() {
 		return num_ops;
 	}
-	_AMF_REPLY_IRPS() : dataSize(sizeof(_AMF_REPLY_IRPS)), data(nullptr), num_ops(0){
+	_RWD_REPLY_IRPS() : dataSize(sizeof(_RWD_REPLY_IRPS)), data(nullptr), num_ops(0){
 
 	}
-} AMF_REPLY_IRPS, *PAMF_REPLY_IRPS;
+} RWD_REPLY_IRPS, *PRWD_REPLY_IRPS;
 
 //constexpr ULONG MAX_COMM_BUFFER_SIZE = sizeof(AMF_REPLY_IRPS) + MAX_IRP_OPS_PER_REQUEST * sizeof(DRIVER_MESSAGE);

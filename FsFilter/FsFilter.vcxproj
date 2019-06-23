@@ -39,7 +39,7 @@
     <ClCompile Include="KernelString.cpp" />
     <ClCompile Include="ShanonEntropy.cpp" />
     <ResourceCompile Include="FsFilter.rc" />
-    <ClCompile Include="AMFMain.cpp" />
+    <ClCompile Include="FSFilter.cpp" />
     <ClCompile Include="Communication.cpp" />
     <ClCompile Include="DriverData.cpp" />
     <Inf Include="FsFilter.inf" />

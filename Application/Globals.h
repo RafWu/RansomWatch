@@ -7,6 +7,7 @@ using namespace System::Threading;
 #include <string>
 #include <windows.h>
 #include <minwinbase.h>
+#include "BackupService.h"
 
 // For verbose levels
 constexpr BOOLEAN VERBOSE_ONLY = FALSE;
@@ -22,6 +23,15 @@ private:
 	ULONGLONG numOfFilesProtected = 0;
 	ULONGLONG numOfDirsProtected = 0;
 public: System::Windows::Forms::TextBox^ logView;
+public: BackupService^ serviceBackup;
+
+public: BackupService^ backupService() {
+	return serviceBackup;
+}
+
+public: VOID setBackupService(BackupService^ newService) {
+	serviceBackup = newService;
+}
 
 public:
 	static property Globals^ Instance
@@ -175,9 +185,15 @@ private:
 
 };
 
-ref class FilterDirectories { // FIXME make use of
+ref class FilterDirectories {
 	// TODO: add serialize and deserialize of those containers
-public: Concurrent::ConcurrentBag< String^> directories;
+public: Concurrent::ConcurrentDictionary< String^, UCHAR>^ directories;
+public:
+	FilterDirectories() {
+		directories = gcnew Concurrent::ConcurrentDictionary< String^, UCHAR>;
+	}
+private:
+	FilterDirectories(const FilterDirectories%) { throw gcnew System::InvalidOperationException("FilterDirectories cannot be copy-constructed"); }
 public:
 	static property FilterDirectories^ Instance
 	{

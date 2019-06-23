@@ -68,15 +68,15 @@
     <ClInclude Include="BackupService.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="FileId.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="cpp.hint" />
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="MyForm.resx">
-      <Filter>Resource Files</Filter>
-    </EmbeddedResource>
     <EmbeddedResource Include="Resource.resx">
       <Filter>Resource Files</Filter>
     </EmbeddedResource>

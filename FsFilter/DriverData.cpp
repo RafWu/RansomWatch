@@ -346,14 +346,14 @@ PIRP_ENTRY DriverData::GetFirstIrpMessage()
 }
 
 VOID DriverData::DriverGetIrps(PVOID Buffer, ULONG BufferSize, PULONG ReturnOutputBufferLength) {
-	*ReturnOutputBufferLength = sizeof(AMF_REPLY_IRPS);
+	*ReturnOutputBufferLength = sizeof(RWD_REPLY_IRPS);
 
 	PCHAR OutputBuffer = (PCHAR)Buffer;
-	OutputBuffer += sizeof(AMF_REPLY_IRPS);
+	OutputBuffer += sizeof(RWD_REPLY_IRPS);
 
-	ULONG BufferSizeRemain = BufferSize - sizeof(AMF_REPLY_IRPS);
+	ULONG BufferSizeRemain = BufferSize - sizeof(RWD_REPLY_IRPS);
 
-	AMF_REPLY_IRPS outHeader;
+	RWD_REPLY_IRPS outHeader;
 	PLIST_ENTRY irpEntryList;
 
 	PIRP_ENTRY PrevEntry = nullptr;
@@ -435,10 +435,10 @@ VOID DriverData::DriverGetIrps(PVOID Buffer, ULONG BufferSize, PULONG ReturnOutp
 	}
 
 	if (outHeader.numOps()) {
-		outHeader.data = PDRIVER_MESSAGE((PCHAR)Buffer + sizeof(AMF_REPLY_IRPS));
+		outHeader.data = PDRIVER_MESSAGE((PCHAR)Buffer + sizeof(RWD_REPLY_IRPS));
 	}
 
-	RtlCopyMemory((PCHAR)Buffer, &(outHeader), sizeof(AMF_REPLY_IRPS));
+	RtlCopyMemory((PCHAR)Buffer, &(outHeader), sizeof(RWD_REPLY_IRPS));
 }
 
 LIST_ENTRY DriverData::GetAllEntries()
@@ -475,7 +475,7 @@ BOOLEAN DriverData::AddDirectoryEntry(PDIRECTORY_ENTRY newEntry)
 		//
 		pStrct = (PDIRECTORY_ENTRY)CONTAINING_RECORD(pEntry, DIRECTORY_ENTRY, entry);
 
-		if (!wcsncmp(newEntry->path, pStrct->path, wcsnlen_s(newEntry->path, MAX_FILE_NAME_LENGTH))) // TODO: improve compare
+		if (!wcsncmp(newEntry->path, pStrct->path, wcsnlen_s(newEntry->path, MAX_FILE_NAME_LENGTH)))
 		{
 			foundMatch = TRUE;
 			break;
@@ -510,7 +510,7 @@ PDIRECTORY_ENTRY DriverData::RemDirectoryEntry(LPCWSTR directory)
 		//
 		pStrct = (PDIRECTORY_ENTRY)CONTAINING_RECORD(pEntry, DIRECTORY_ENTRY, entry);
 
-		if (!wcsncmp(directory, pStrct->path, wcsnlen_s(directory, MAX_FILE_NAME_LENGTH))) // TODO: improve compare
+		if (!wcsncmp(directory, pStrct->path, wcsnlen_s(directory, MAX_FILE_NAME_LENGTH)))
 		{
 			if (RemoveEntryList(pEntry)) {
 				ret = pStrct;

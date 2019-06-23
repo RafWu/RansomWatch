@@ -10,14 +10,15 @@ using namespace System;
 #include "Thresholds.h"
 
 ref class GProcessRecord {
-	ULONGLONG gid; // FIXME: add to report
-	Generic::SortedSet<ULONG>^ Pids; // FIXME: add to report with comment
+	ULONGLONG gid;
+	Generic::SortedSet<ULONG>^ Pids;
 	BOOLEAN malicious;
 	BOOLEAN killed;
-	BOOLEAN safeProcess;
+	BOOLEAN reported;
 	String^ appName;
 
 	DateTime startTime;
+	DateTime killTime;
 
 	ULONGLONG totalReadOperations;
 	ULONGLONG totalWriteOperations;
@@ -103,9 +104,9 @@ ref class GProcessRecord {
 		appName = nullptr;
 		malicious = FALSE;
 		killed = FALSE;
-		safeProcess = FALSE;
+		reported = FALSE;
 
-		startTime = DateTime::Now;
+		startTime = DateTime::UtcNow; // TODO: change to utc to support azure
 
 		totalReadOperations = 0;
 		totalWriteOperations = 0;
@@ -179,22 +180,11 @@ ref class GProcessRecord {
 			}
 			CloseHandle(h);
 		}
-		if (appName != nullptr) {
-			if (appName->Contains("explorer.exe")) {
-				safeProcess = TRUE;
-			}
-			else {
-				safeProcess = FALSE;
-			}
-		}
-		else {
-			safeProcess = FALSE;
-			appName = gcnew System::String("NaN");
-		}
 		malicious = FALSE;
 		killed = FALSE;
+		reported = FALSE;
 
-		startTime = DateTime::Now;
+		startTime = DateTime::UtcNow;
 
 		totalReadOperations = 0;
 		totalWriteOperations = 0;
@@ -249,11 +239,6 @@ ref class GProcessRecord {
 		Globals::Instance->postLogMessage(newMsg, VERBOSE_ONLY);
 		
 		Pids->Add(Irp.PID);
-		
-		if (safeProcess) {
-			DBOUT("Safe process, skipping " << std::endl);
-			return TRUE;
-		}
 
 		Monitor::Enter(this);
 		switch (Irp.IRP_OP) 
@@ -495,6 +480,17 @@ ref class GProcessRecord {
 		totalReadOperations++;
 	}
 
+	public: BOOLEAN setReported() {
+		Monitor::Enter(this);
+		if (reported) {
+			Monitor::Exit(this);
+			return FALSE;
+		}
+		reported = TRUE;
+		Monitor::Exit(this);
+		return TRUE;
+	}
+
 	// assumes that caller protect this call
 	public: BOOLEAN isMalicious() {
 		return malicious;
@@ -508,6 +504,7 @@ ref class GProcessRecord {
 	// assumes that caller protect this call
 	public: VOID setKilled() {
 		killed = TRUE;
+		killTime = DateTime::UtcNow;
 	}
 	
 	// assumes that caller protect this call
@@ -524,18 +521,21 @@ ref class GProcessRecord {
 	public: String^ Name() {
 		return appName;
 	}
-	// assumes that caller protect this call
-	public: BOOLEAN isSafe() {
-		return safeProcess;
-	}
 
 	// assumes that caller protect this call
-	public: DateTime Date() {
+	public: DateTime DateStart() {
 		return startTime;
+	}
+	
+			// assumes that caller protect this call
+	public: DateTime DateKilled() {
+		return killTime;
 	}
 
 	public: BOOLEAN isProcessMalicious() {
 		Monitor::Enter(this);
+
+		ULONG numFilesChanged = filesChanged->Count;
 
 		BOOLEAN deleteTrigger = DeletionTrigger();
 		if (deleteTrigger) {
@@ -585,7 +585,7 @@ ref class GProcessRecord {
 		BYTE triggersReached = deleteTrigger + createTrigger + 2 * renameTrigger + listingTrigger +
 			2 * highEntropyTrigger + 2 * extensionsTrigger  + 2 * trapsTrigger +
 			readTrigger + 2 * accessTrigger + 2 * extensionsChangeTrigger + 2 * moveTrigger;
-		if (triggersReached >= TRIGGERS_TRESHOLD && highEntropyWrites >= NUM_WRITES_FOR_TRIGGER) { // TODO: want to remove num writes check
+		if (triggersReached >= TRIGGERS_TRESHOLD && highEntropyWrites >= NUM_WRITES_FOR_TRIGGER && numFilesChanged > 2) { // might want to remove num writes check
 			malicious = TRUE;
 			Monitor::Exit(this);
 			return TRUE;
@@ -729,7 +729,7 @@ ref class GProcessRecord {
 		if (normFiles > ACCESS_FILES_TRESHOLDS && readWriteFilesCount > MINIMUM_FILES_ACCESS_THRESHOLD) return TRUE;
 
 		// if reached here there are not enough files written or number of files written is small
-		// TODO: we can try to check bytes write data
+		// we can try to check bytes write data
 		return FALSE;
 	}
 
@@ -753,15 +753,13 @@ ref class GProcessRecord {
 };
 
 ref class ProcessesMemory {
-	//std::shared_mutex appLock;
 public:
 	ProcessesMemory() {
-		// pid to record
+		// gid to record
 		Processes = gcnew Concurrent::ConcurrentDictionary<ULONGLONG, GProcessRecord^>;
 	}
 private:
 	ProcessesMemory(const ProcessesMemory%) { throw gcnew System::InvalidOperationException("ApplicationsMemory cannot be copy-constructed"); }
-	// TODO: add serialize and deserialize of those containers
 public: Concurrent::ConcurrentDictionary<ULONGLONG, GProcessRecord^>^ Processes;
 public:
 	static property ProcessesMemory^ Instance

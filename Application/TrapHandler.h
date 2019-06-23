@@ -27,6 +27,9 @@ private:
 	std::size_t CalcFileSize(const std::vector<HANDLE>& vHandles);
 	BOOLEAN TrapGenerate(const fs::directory_entry& directory);
 
+	int addDir(const fs::directory_entry& dirPath);
+	int remDir(const fs::directory_entry& dirPath);
+
 public:
 	TrapHandler() {
 		Buffer = new UCHAR[MAX_FILE_BUFFER_SIZE];
@@ -40,8 +43,7 @@ public:
 	int initDirTraps(System::String ^ Path);
 	int remDirTraps(System::String^ Path);
 	int cleanTraps();
-private: int addDir(const fs::directory_entry& dirPath);
-private: int remDir(const fs::directory_entry& dirPath);
+
 
 
 };

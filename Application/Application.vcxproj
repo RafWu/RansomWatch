@@ -161,6 +161,7 @@
     <ClInclude Include="BackupService.h" />
     <ClInclude Include="Common.h" />
     <ClInclude Include="ExtensionsCategories.h" />
+    <ClInclude Include="FileId.h" />
     <ClInclude Include="FilterWorker.h" />
     <ClInclude Include="MyForm.h">
       <FileType>CppForm</FileType>

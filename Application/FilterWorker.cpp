@@ -41,41 +41,41 @@ Return Value
 		ULONGLONG numOps = 0;
 		hr = FilterSendMessage(Port, &GetIrpMsg, sizeof(COM_MESSAGE), Buffer, BufferSize, &ReplySize);
 		if (FAILED(hr)) {
-			Globals::Instance->postLogMessage(String::Concat("Failed irp request, stopping", numOps, System::Environment::NewLine), PRIORITY_PRINT);
+			Globals::Instance->postLogMessage(String::Concat("<V> Failed irp request, stopping", System::Environment::NewLine), PRIORITY_PRINT);
 			Globals::Instance->setCommCloseStat(TRUE);
 			break;
 		}
 
-		if (ReplySize == 0 || ReplySize <= sizeof(AMF_REPLY_IRPS)) {
-			Globals::Instance->postLogMessage(String::Concat("No ops to report, waiting", numOps, System::Environment::NewLine), VERBOSE_ONLY);
+		if (ReplySize == 0 || ReplySize <= sizeof(RWD_REPLY_IRPS)) {
+			Globals::Instance->postLogMessage(String::Concat("<V> No ops to report, waiting", System::Environment::NewLine), VERBOSE_ONLY);
 			Sleep(100);
 			continue;
 		}
-		PAMF_REPLY_IRPS ReplyMsgs = (PAMF_REPLY_IRPS)Buffer;
+		PRWD_REPLY_IRPS ReplyMsgs = (PRWD_REPLY_IRPS)Buffer;
 		PDRIVER_MESSAGE pMsgIrp = ReplyMsgs->data; // get first irp if any
 		numOps = ReplyMsgs->numOps();
 		if (numOps == 0 || pMsgIrp == nullptr) {
-			Globals::Instance->postLogMessage(String::Concat("No ops to report, waiting", numOps, System::Environment::NewLine), VERBOSE_ONLY);
+			Globals::Instance->postLogMessage(String::Concat("<V> No ops to report, waiting", System::Environment::NewLine), VERBOSE_ONLY);
 			Sleep(100);
 			continue;
 		}
 		// FIXME: compare memory size, replySize (minus AMP_REPLY_IRPS) with numOps and size of DRIVER_MESSAGE, assert numOps <= 10, log are fail thread accordingly
 		// FIXME : assert ReplyMsgs->data points to Buffer + sizeof(AMF_REPLY_IRPS)
-		Globals::Instance->postLogMessage(String::Concat("Received num ops: ", numOps, System::Environment::NewLine), VERBOSE_ONLY);
+		Globals::Instance->postLogMessage(String::Concat("<V> Received num ops: ", numOps, System::Environment::NewLine), VERBOSE_ONLY);
 		while (pMsgIrp != nullptr) 
 		{
 			hr = ProcessIrp(*pMsgIrp);
 			if (hr != S_OK) {
-				Globals::Instance->postLogMessage(String::Concat("Failed to handle irp msg", System::Environment::NewLine), VERBOSE_ONLY);
+				Globals::Instance->postLogMessage(String::Concat("<V> Failed to handle irp msg", System::Environment::NewLine), VERBOSE_ONLY);
 			}
 			gidsCheck.insert(pMsgIrp->Gid);
 			if (Globals::Instance->Verbose()) {
 				if (pMsgIrp->filePath.Length) {
 					std::wstring fileNameStr(pMsgIrp->filePath.Buffer, pMsgIrp->filePath.Length / 2);
-					Globals::Instance->postLogMessage(String::Concat("Received irp on file: ", gcnew String(fileNameStr.c_str()), System::Environment::NewLine), VERBOSE_ONLY);
+					Globals::Instance->postLogMessage(String::Concat("<V> Received irp on file: ", gcnew String(fileNameStr.c_str()), System::Environment::NewLine), VERBOSE_ONLY);
 				}
 				else {
-					Globals::Instance->postLogMessage(String::Concat("Received irp with file len 0", System::Environment::NewLine), VERBOSE_ONLY);
+					Globals::Instance->postLogMessage(String::Concat("<V> Received irp with file len 0", System::Environment::NewLine), VERBOSE_ONLY);
 				}
 			}
 			pMsgIrp = (PDRIVER_MESSAGE)pMsgIrp->next;
@@ -221,20 +221,15 @@ VOID HandleMaliciousApplication(GProcessRecord^ record, HANDLE comPort) {
 VOID CheckHandleMaliciousApplication(ULONGLONG gid, HANDLE comPort) {
 	GProcessRecord^ record = nullptr;
 	if (ProcessesMemory::Instance->Processes->TryGetValue(gid, record) && record != nullptr) {
-		if (record->isSafe()) {
-			DBOUT("Safe process skipping malicious check" << std::endl);
-			return;
-		}
 		if (record->isProcessMalicious()) {
-			Globals::Instance->postLogMessage(String::Concat("<W> Found malicious application", System::Environment::NewLine), PRIORITY_PRINT);
+			if (!record->setReported()) return;
+			//Globals::Instance->postLogMessage(String::Concat("<W> Found malicious application", System::Environment::NewLine), PRIORITY_PRINT);
+			HandleMaliciousApplication(record, comPort);
 			Generic::SortedSet<String^>^ triggersDetected = record->GetTriggersBreached();
-			String^ msg = gcnew String("Breached triggers: ");
-			msg = String::Concat(msg,String::Join(", ", triggersDetected));
+			String^ msg = gcnew String("<I> Breached triggers: ");
+			msg = String::Concat(msg, String::Join(", ", triggersDetected));
 			msg = String::Concat(msg, System::Environment::NewLine);
 			Globals::Instance->postLogMessage(msg, PRIORITY_PRINT);
-
-			HandleMaliciousApplication(record, comPort);
-
 			Generic::SortedSet<String^>^ createdFiles = record->GetCreatedFiles();
 			Generic::SortedSet<String^>^ changedFiles = record->GetChangedFiles();
 			String^ reportFile = String::Concat("C:\\Report", record->Gid().ToString(), ".log");
@@ -244,9 +239,9 @@ VOID CheckHandleMaliciousApplication(ULONGLONG gid, HANDLE comPort) {
 				sw->Write("Files report for ransomware running from exe: "); // FIXME: on kill message return image files paths and report
 				sw->WriteLine(record->Name());
 				sw->Write("Process started on time: ");
-				sw->WriteLine(record->Date());
+				sw->WriteLine(record->DateStart().ToLocalTime());
 				sw->Write("Time report: ");
-				sw->WriteLine(DateTime::Now);
+				sw->WriteLine(record->DateKilled().ToLocalTime());
 				Monitor::Enter(record);
 				if (record->isKilled()) {
 					sw->WriteLine("Process has been killed");
@@ -271,12 +266,38 @@ VOID CheckHandleMaliciousApplication(ULONGLONG gid, HANDLE comPort) {
 				for each (String ^ filePath in createdFiles) {
 					sw->WriteLine(filePath);
 				}
+				sw->WriteLine();
+
+				Globals::Instance->postLogMessage(String::Concat("<I> Created report file for ransomware: ", reportFile, System::Environment::NewLine), PRIORITY_PRINT);			
+				sw->Flush();
+				sw->WriteLine("Restore result:");
+				BackupService^ backService = Globals::Instance->backupService();
+				if (backService == nullptr) {
+					Globals::Instance->postLogMessage(String::Concat("<E> Failed to restore files, backupservice not init", System::Environment::NewLine), PRIORITY_PRINT);
+					sw->WriteLine("Failed to use backup service");
+				}
+				else {
+					try {
+
+						Generic::List<String^>^ returnedOutput = backService->RestoreFilesFromSnapShot(changedFiles, record->DateStart());
+						for each (String ^ restoreOut in returnedOutput) {
+							sw->WriteLine(restoreOut);
+						}
+
+					}
+					catch (Exception^ e) {
+						Globals::Instance->postLogMessage(String::Concat("<E> Failed to restore files, backupservice exception: ", e->Message, System::Environment::NewLine), PRIORITY_PRINT);
+						sw->WriteLine("Failed to use backup service");
+					}
+
+				}
+
+				sw->WriteLine();
 				sw->WriteLine("End file");
 				sw->Close();
-				Globals::Instance->postLogMessage(String::Concat("<I> Created report file for ransomware: ", reportFile, System::Environment::NewLine), PRIORITY_PRINT);
 			}
-			catch (...) {
-				Globals::Instance->postLogMessage(String::Concat("<E> Failed to create report file", System::Environment::NewLine), PRIORITY_PRINT);
+			catch (Exception^ e) {
+				Globals::Instance->postLogMessage(String::Concat("<E> Failed to create report file: ", e->Message, System::Environment::NewLine), PRIORITY_PRINT);
 			}
 
 		}

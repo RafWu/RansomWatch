@@ -35,6 +35,7 @@ HRESULT AntiRansomWareApp::MyForm::initWorkThread() {
 }
 
 BOOLEAN AntiRansomWareApp::MyForm::openKernelCommunication() {
+	
 	BOOLEAN openComDriver = openKernelDriverCom(); // if true com is open else false
 	//Globals::Instance->setCommCloseStat(!openComDriver);
 	if (openComDriver) {
@@ -53,7 +54,7 @@ BOOLEAN AntiRansomWareApp::MyForm::openKernelCommunication() {
 			Buffer[i] = WindowsPath[i];
 		}
 
-		// TODO: if fail driver cant work
+		// if fail driver cant work, system path for driver
 		if (!QueryDosDevice(Buffer, szNtDeviceName, MAX_PATH))
 		{
 			Globals::Instance->setCommCloseStat(TRUE);
@@ -124,6 +125,8 @@ HRESULT AntiRansomWareApp::MyForm::RemoveFilterDirectory(String ^ directory)
 		return S_FALSE;
 	}
 	else if (retSize == 1 && retOp == TRUE) { //reply op
+		UCHAR dummy = 0;
+		FilterDirectories::Instance->directories->TryRemove(directory, dummy);
 		return S_OK;
 	}
 
@@ -164,6 +167,8 @@ HRESULT AntiRansomWareApp::MyForm::AddFilterDirectory(String ^ directory)
 	//msg = System::String::Concat(msg, "\n");
 	//logViewer->AppendText(msg);
 	if (retSize == 1 && retOp == TRUE) { //reply op
+		UCHAR dummy = 0;
+		FilterDirectories::Instance->directories->TryAdd(directory, dummy);
 		return S_OK;
 	}
 
