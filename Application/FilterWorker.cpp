@@ -278,11 +278,11 @@ VOID CheckHandleMaliciousApplication(ULONGLONG gid, HANDLE comPort) {
 				}
 				else {
 					try {
-
 						Generic::List<String^>^ returnedOutput = backService->RestoreFilesFromSnapShot(changedFiles, record->DateStart());
 						for each (String ^ restoreOut in returnedOutput) {
 							sw->WriteLine(restoreOut);
 						}
+						Globals::Instance->postLogMessage(String::Concat("<I> Files restore written to report file: ", reportFile, System::Environment::NewLine), PRIORITY_PRINT);
 
 					}
 					catch (Exception^ e) {

@@ -18,8 +18,7 @@ class DriverData
 	LIST_ENTRY rootDirectories;
 	KSPIN_LOCK irpOpsLock;
 	KSPIN_LOCK directoriesSpinLock;
-	
-	// new code start
+
 	ULONGLONG GidCounter;
 	HashMap GidToPids; // list entry of pids
 	HashMap PidToGids;
@@ -27,7 +26,6 @@ class DriverData
 	LIST_ENTRY GidsList;
 	KSPIN_LOCK PIDRecordsLock;
 
-	// new code end
 
 private:
 	// call assumes protected code

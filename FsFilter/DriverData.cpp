@@ -349,6 +349,7 @@ VOID DriverData::DriverGetIrps(PVOID Buffer, ULONG BufferSize, PULONG ReturnOutp
 	*ReturnOutputBufferLength = sizeof(RWD_REPLY_IRPS);
 
 	PCHAR OutputBuffer = (PCHAR)Buffer;
+	ASSERT(OutputBuffer != nullptr);
 	OutputBuffer += sizeof(RWD_REPLY_IRPS);
 
 	ULONG BufferSizeRemain = BufferSize - sizeof(RWD_REPLY_IRPS);

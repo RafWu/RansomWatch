@@ -32,7 +32,7 @@ constexpr double MAX_ENTROPY = 8.0;
 constexpr double HIGH_ENTROPY_THRESHOLD			= 7.6;
 
 // Extension
-constexpr double FILES_EXTENSION_THRESHOLD		= 0.25;	// diff between number of extension written to those read and written
+constexpr double FILES_EXTENSION_THRESHOLD		= 0.19;	// diff between number of extension written to those read and written
 
 // Extension change
 constexpr double CHANGE_EXTENSION_THRESHOLD		= 0.2;	// change extension out of accessed files
@@ -44,8 +44,8 @@ constexpr double EXTENSION_OPENED_SENSITIVE		= 0.25;	// number of different cate
 constexpr double LISTING_THRESHOLD				= 0.4;	// listed directories out of all subdirs in protected area
 
 // Moving
-constexpr double MOVE_IN_THRESHOLD				= 0.05;	// listed directories out of all subdirs in protected area
-constexpr double MOVE_OUT_THRESHOLD				= 0.1;	// listed directories out of all subdirs in protected area
+constexpr double MOVE_THRESHOLD					= 0.49;	// norm of (move out vs move in) or (move in vs move out)
+//constexpr double MOVE_OUT_THRESHOLD				= 0.1;	// listed directories out of all subdirs in protected area
 
 // Read
 constexpr double FILES_READ_THRESHOLD			= 0.4;	// files read out of all files in protected area

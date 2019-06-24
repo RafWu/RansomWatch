@@ -3,6 +3,12 @@
 #include <windows.h>
 #include <subauth.h>
 #include "Traps.h"
+#include "Debug.h"
+#include <vcclr.h>
+#include <string>
+#include <sstream>
+
+
 
 using namespace Microsoft::WindowsAzure::Storage;
 using namespace Microsoft::WindowsAzure::Storage::Blob;
@@ -64,10 +70,10 @@ public: BackupService() {
 			if (!isFileTrap) {
 				String^ upFileName = fi->FullName->Replace('\\', '/');
 				CloudBlockBlob^ blob = container->GetBlockBlobReference(upFileName);
-				bool exist = blob->Exists(nullptr, nullptr);
-				if (exist)
-					blob->CreateSnapshot(nullptr, nullptr, nullptr, nullptr);
-				blob->UploadFromFileAsync(fi->FullName);
+				//bool exist = blob->Exists(nullptr, nullptr);
+				blob->UploadFromFile(fi->FullName, nullptr, nullptr, nullptr);
+				blob->CreateSnapshotAsync(nullptr, nullptr, nullptr, nullptr);
+				
 				
 			}
 		}
@@ -85,16 +91,17 @@ public: BackupService() {
 		String^ blobDirName = dirPath->Replace('\\', '/'); // now in blob format
 		// Get the value of the continuation token returned by the listing call.
 
-		Generic::IEnumerable<IListBlobItem^>^  blobsItemsDir = container->ListBlobs(blobDirName, true, BlobListingDetails::All , nullptr, nullptr);
-		for each (IListBlobItem ^ blobItem in blobsItemsDir) {
-			CloudBlockBlob^ blob = (CloudBlockBlob^)blobItem;
-			blob->DeleteIfExistsAsync();
+		Generic::IEnumerable<IListBlobItem^>^  blobsItemsDir = container->ListBlobs(blobDirName, true, BlobListingDetails::None , nullptr, nullptr);
+		for each (IListBlobItem ^ blob in blobsItemsDir) {
+			//CloudBlockBlob^ blob = (CloudBlockBlob^)blobItem;
+			if (blob->GetType() == CloudBlob::typeid || blob->GetType()->BaseType == CloudBlob::typeid)
+				((CloudBlob^)blob)->DeleteIfExists(DeleteSnapshotsOption::IncludeSnapshots, nullptr, nullptr, nullptr);
 		}
 		
 		return TRUE;
 	}
 
-public: Generic::List<String^>^ RestoreFilesFromSnapShot(Generic::SortedSet<String ^>^ filesPaths, DateTime RansomStartTimeUtc) {
+	public: Generic::List<String^>^ RestoreFilesFromSnapShot(Generic::SortedSet<String ^>^ filesPaths, DateTime RansomStartTimeUtc) {
 		if (filesPaths == nullptr) return nullptr;
 		Generic::List<String^>^ restoreReturn = gcnew Generic::List<String^>; // same order as filesPaths
 		//String^ blobDirName = dirPath->Replace('\\', '/'); // now in blob format
@@ -115,7 +122,7 @@ public: Generic::List<String^>^ RestoreFilesFromSnapShot(Generic::SortedSet<Stri
 				if (TrapsMemory::Instance->traps->TryGetValue(directory, trapsRecords)) {
 					BOOLEAN isTrap = FALSE;
 					for each (TrapRecord ^ record in trapsRecords) {
-						if (filePath->Contains(record->filePath)) {
+						if (record->filePath->Contains(filePath)) {
 							isTrap = TRUE;
 							break;
 						}
@@ -137,13 +144,26 @@ public: Generic::List<String^>^ RestoreFilesFromSnapShot(Generic::SortedSet<Stri
 					CloudBlockBlob^ blob = (CloudBlockBlob^)blobItem;
 					Nullable<DateTimeOffset>^ timeOffest = blob->SnapshotTime;
 					if (timeOffest != nullptr && timeOffest->HasValue) {
+						String^ debug1 = String::Concat("ransom start time utc: ", RansomStartTimeUtc, " blob create time: ", timeOffest->Value.UtcDateTime);
+						pin_ptr<const wchar_t> wch = PtrToStringChars(debug1);
+						std::wstring stringStr(wch);
+						DBOUT(stringStr << std::endl);
 						if (DateTime::Compare(timeOffest->Value.UtcDateTime, RansomStartTimeUtc) < 0) { //earlier
 							if (!foundNewTime) { // new item is better
+								String^ debug2 = String::Concat("set file time: ", timeOffest->Value.UtcDateTime);
+								pin_ptr<const wchar_t> wch = PtrToStringChars(debug1);
+								std::wstring stringStr(wch);
+								DBOUT(stringStr << std::endl);
 								bestTime = timeOffest->Value.UtcDateTime;
 								bestTimeBlob = blob;
 								foundNewTime = TRUE;
+
 							}
 							else if (DateTime::Compare(timeOffest->Value.UtcDateTime, bestTime) > 0){
+								String^ debug3 = String::Concat("replace time: ", bestTime, " blob create time: ", timeOffest->Value.UtcDateTime, System::Environment::NewLine);
+								pin_ptr<const wchar_t> wch = PtrToStringChars(debug1);
+								std::wstring stringStr(wch);
+								DBOUT(stringStr << std::endl);
 								bestTime = timeOffest->Value.UtcDateTime;
 								bestTimeBlob = blob;
 							}

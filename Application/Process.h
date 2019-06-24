@@ -20,14 +20,14 @@ ref class GProcessRecord {
 	DateTime startTime;
 	DateTime killTime;
 
-	ULONGLONG totalReadOperations;
-	ULONGLONG totalWriteOperations;
-	ULONGLONG totalRenameOperations;
-	ULONGLONG totalCreateOperations;
+	ULONGLONG totalReadOperations; // not used, for debug only
+	ULONGLONG totalWriteOperations; // not used, for debug only
+	ULONGLONG totalRenameOperations; // not used, for debug only
+	ULONGLONG totalCreateOperations; // not used, for debug only
 	
 	ULONGLONG trapsRead;
 	ULONGLONG trapsWrite;
-	ULONGLONG trapsOpened;
+	ULONGLONG trapsOpened; // not used, for debug only
 	ULONGLONG trapsRenamed;
 	ULONGLONG trapsDeleted;
 	
@@ -536,6 +536,7 @@ ref class GProcessRecord {
 		Monitor::Enter(this);
 
 		ULONG numFilesChanged = filesChanged->Count;
+		triggersBreached->Clear();
 
 		BOOLEAN deleteTrigger = DeletionTrigger();
 		if (deleteTrigger) {
@@ -691,13 +692,10 @@ ref class GProcessRecord {
 		if (normNumCategories > EXTENSION_OPENED_SENSITIVE) return TRUE;
 
 		Generic::SortedSet<String^>^ extensionsUnion = gcnew Generic::SortedSet<String^>;
-		Generic::SortedSet<String^>^ extensionsIntersect = gcnew Generic::SortedSet<String^>;
 		extensionsUnion->UnionWith(extensionsWrite);
 		extensionsUnion->UnionWith(extensionsRead);
-		extensionsIntersect->UnionWith(extensionsWrite);
-		extensionsIntersect->SymmetricExceptWith(extensionsRead);
 		if (extensionsUnion->Count > 0) {
-			return (((DOUBLE)extensionsIntersect->Count / (DOUBLE)extensionsUnion->Count) > FILES_EXTENSION_THRESHOLD);
+			return (((DOUBLE)extensionsWrite->Count / (DOUBLE)extensionsUnion->Count) < FILES_EXTENSION_THRESHOLD);
 
 		}
 		return FALSE;
@@ -705,13 +703,9 @@ ref class GProcessRecord {
 
 	// compare files moved inside protected area to files deleted and files moved out
 	private: BOOLEAN FilesMovedTrigger() {
-		if (fileIdsDeleted->Count + filesMovedOutCount > filesMovedInCount) {
-			return (((DOUBLE(filesMovedInCount)) / (DOUBLE(fileIdsDeleted->Count + filesMovedOutCount))) > MOVE_IN_THRESHOLD);
+		if (filesMovedInCount > MINIMUM_FILES_CREATE_THRESHOLD && filesMovedOutCount > MINIMUM_FILES_CREATE_THRESHOLD) {
+			return (((DOUBLE(filesMovedInCount)) / (DOUBLE(filesMovedOutCount))) > MOVE_THRESHOLD);
 		}
-		else if (filesMovedInCount > fileIdsDeleted->Count + filesMovedOutCount) {
-			return (((DOUBLE(fileIdsDeleted->Count + filesMovedOutCount)) / (DOUBLE(filesMovedInCount))) > MOVE_OUT_THRESHOLD);
-		}
-
 		return FALSE;
 	}
 

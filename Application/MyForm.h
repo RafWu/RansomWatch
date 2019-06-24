@@ -51,7 +51,7 @@ namespace AntiRansomWareApp {
 	private: BOOLEAN openKernelCommunication();
 	private: System::Windows::Forms::Button^  Exit;
 	private: System::Windows::Forms::Button^ MinimizeButton;
-	public: BackupService^ service;
+	private: BackupService^ service;
 	public:
 		MyForm(void)
 		{

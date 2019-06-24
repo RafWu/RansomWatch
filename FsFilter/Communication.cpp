@@ -14,7 +14,7 @@ NTSTATUS InitCommData(
 	RtlInitUnicodeString(&uniString, ComPortName);
 
 	status = FltBuildDefaultSecurityDescriptor(&sd, FLT_PORT_ALL_ACCESS); //  We secure the port so only ADMINs & SYSTEM can acecss it.
-	//status = RtlSetDaclSecurityDescriptor(sd, TRUE, NULL, FALSE); // allow user application without admin to enter
+	status = RtlSetDaclSecurityDescriptor(sd, TRUE, NULL, FALSE); // allow user application without admin to enter
 	
 	if (NT_SUCCESS(status)) {
 
