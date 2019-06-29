@@ -61,8 +61,6 @@ ref class GProcessRecord {
 	ULONGLONG totalReadBytes;
 	ULONGLONG totalWriteBytes;
 
-	ULONGLONG highEntropyWrites;
-
 	public: Generic::SortedSet<String^>^ GetTriggersBreached() {
 		Generic::SortedSet<String^>^ ret = gcnew Generic::SortedSet<String^>;
 		Monitor::Enter(this);
@@ -151,8 +149,6 @@ ref class GProcessRecord {
 		totalReadBytes = 0;
 		totalWriteBytes = 0;
 
-		highEntropyWrites = 0;
-
 	}
 	public: GProcessRecord(ULONGLONG GID, ULONG Pid) {
 		gid = GID;
@@ -228,8 +224,6 @@ ref class GProcessRecord {
 
 		totalReadBytes = 0;
 		totalWriteBytes = 0;
-
-		highEntropyWrites = 0;
 
 	}
 	public: BOOLEAN AddIrpRecord(const DRIVER_MESSAGE& Irp) {
@@ -437,9 +431,6 @@ ref class GProcessRecord {
 		else {
 			DBOUT("No extension to add " << Extension << std::endl);
 		}
-		if (entropy > HIGH_ENTROPY_THRESHOLD) {
-			highEntropyWrites++;
-		}
 
 		//handle entropy
 		sumWeightWriteEntropy = (entropy * (DOUBLE)writeSize) + sumWeightWriteEntropy;
@@ -586,7 +577,7 @@ ref class GProcessRecord {
 		BYTE triggersReached = deleteTrigger + createTrigger + 2 * renameTrigger + listingTrigger +
 			2 * highEntropyTrigger + 2 * extensionsTrigger  + 2 * trapsTrigger +
 			readTrigger + 2 * accessTrigger + 2 * extensionsChangeTrigger + 2 * moveTrigger;
-		if (triggersReached >= TRIGGERS_TRESHOLD && highEntropyWrites >= NUM_WRITES_FOR_TRIGGER && numFilesChanged > 2) { // might want to remove num writes check
+		if (triggersReached >= TRIGGERS_TRESHOLD  && numFilesChanged > 2) { // might want to remove num writes check
 			malicious = TRUE;
 			Monitor::Exit(this);
 			return TRUE;
