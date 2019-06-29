@@ -13,6 +13,7 @@ using namespace System::Threading;
 constexpr BOOLEAN VERBOSE_ONLY = FALSE;
 constexpr BOOLEAN PRIORITY_PRINT = TRUE;
 
+// singleton for managing program across modules
 ref class Globals {
 private:
 	BOOLEAN isKillProcess = TRUE;

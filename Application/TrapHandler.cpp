@@ -120,6 +120,9 @@ BOOLEAN TrapHandler::TrapGenerate(const fs::directory_entry& DirPath) {
 	std::unordered_map<std::wstring, std::vector<std::wstring>> FilesDir;
 	WIN32_FIND_DATA data;
 	HANDLE hFind;
+
+	// collect extensions
+
 	if ((hFind = FindFirstFile((directory / "*").c_str(), &data)) != INVALID_HANDLE_VALUE) {
 		do {
 			fs::path file(data.cFileName);
@@ -135,7 +138,8 @@ BOOLEAN TrapHandler::TrapGenerate(const fs::directory_entry& DirPath) {
 			}
 		} while (FindNextFile(hFind, &data) != FALSE);
 	}
-
+	
+	// for each extension found in dir
 	for (const auto& extensionData : FilesDir) {
 		std::vector<HANDLE> vHandles;
 		std::wstring extension(extensionData.first);
@@ -170,7 +174,6 @@ BOOLEAN TrapHandler::TrapGenerate(const fs::directory_entry& DirPath) {
 
 
 		if (trapHandle != INVALID_HANDLE_VALUE) {
-			//size = 20;
 			FillRandContent(trapHandle, size);
 			if (!SetFileTime(trapHandle, &time, &time, &time)) {
 				DBOUT("Failed to set rand time for trap" << GetLastError() << std::endl);

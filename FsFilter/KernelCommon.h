@@ -10,10 +10,8 @@
 #define IS_DEBUG_IRP 0
 #endif // DEBUG_IRP
 
-
-
-// new code begin
-
+// PID_ENTRY - for each process in the system we record, we get its pid and image file, those are stord in thi struct
+// the struct is meant to be used in blist (LIST_ENTRY)
 typedef struct _PID_ENTRY {
 	LIST_ENTRY entry;
 	PUNICODE_STRING Path;
@@ -41,8 +39,6 @@ typedef struct _PID_ENTRY {
 	//fixme needs new and delete operator, dtor
 } PID_ENTRY, * PPID_ENTRY;
 
-// new code end
-
 typedef struct _DIRECTORY_ENTRY {
 	LIST_ENTRY entry;
 	WCHAR path[MAX_FILE_NAME_LENGTH];
@@ -57,7 +53,7 @@ typedef struct _IRP_ENTRY {
 	LIST_ENTRY entry;
 	DRIVER_MESSAGE data;
 	UNICODE_STRING filePath; // keep path to unicode string related to the object, we copy it later to user
-	WCHAR Buffer[MAX_FILE_NAME_LENGTH];
+	WCHAR Buffer[MAX_FILE_NAME_LENGTH]; // unicode string buffer for file name
 
 	_IRP_ENTRY() {
 		filePath.Length = 0;
@@ -99,6 +95,8 @@ WCHAR* stristr(const WCHAR* String, const WCHAR* Pattern);
 
 BOOLEAN startsWith(PUNICODE_STRING String, PWCHAR Pattern);
 
+// GID_ENTRY - for each gid in the system we record, holds pids entries (PID_ENTRY)
+// the struct is meant to be used in blist (LIST_ENTRY)
 struct GID_ENTRY {
 	LIST_ENTRY GidListEntry;
 	ULONGLONG gid;

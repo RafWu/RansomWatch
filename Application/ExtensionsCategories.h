@@ -2,6 +2,7 @@
 
 #include <unordered_map>
 
+// extensions categories used for extensions trigger, we divided most known categories to types
 enum CATEGORIES {
 	CATEGORIES_DOCS,
 	CATEGORIES_XLS,
@@ -17,7 +18,5 @@ enum CATEGORIES {
 	NUM_CATEGORIES_NO_OTHERS,
 	NUM_CATEGORIES_WITH_OTHERS = NUM_CATEGORIES_NO_OTHERS + 7
 };
-
-//extern std::unordered_map<std::wstring, uint16_t> reverseCategories;
 
 uint16_t ExtensionCategory(const wchar_t * Extension);

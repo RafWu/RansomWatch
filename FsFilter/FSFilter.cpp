@@ -1012,7 +1012,6 @@ NTSTATUS CopyFileIdInfo(_Inout_ PFLT_CALLBACK_DATA Data, PDRIVER_MESSAGE newItem
 	return hr;
 }
 
-/* FilePath should be allocated before*/
 NTSTATUS GetFileNameInfo(
 	_In_ PCFLT_RELATED_OBJECTS FltObjects,
 	PUNICODE_STRING FilePath, 

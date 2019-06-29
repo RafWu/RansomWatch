@@ -5,36 +5,43 @@
 #include "KernelString.h"
 #include "HashTable.h"
 
+
+/* DriverData: shared class across driver, hold driver D.S. */
 class DriverData
 {
-	BOOLEAN FilterRun;
+	BOOLEAN FilterRun; // true if filter currently runs
 	PFLT_FILTER Filter;
-	PDRIVER_OBJECT DriverObject;
-	WCHAR systemRootPath[MAX_FILE_NAME_LENGTH];
-	ULONG pid;
-	ULONG irpOpsSize;
-	ULONG directoryRootsSize;
-	LIST_ENTRY irpOps;
-	LIST_ENTRY rootDirectories;
-	KSPIN_LOCK irpOpsLock;
-	KSPIN_LOCK directoriesSpinLock;
+	PDRIVER_OBJECT DriverObject; // internal
+	WCHAR systemRootPath[MAX_FILE_NAME_LENGTH]; // system root path, help analyze image files loaded
+	ULONG pid; // pid of the current connected user mode application, set by communication
+	
+	ULONG irpOpsSize; // number of irp ops waiting in entry_list
+	LIST_ENTRY irpOps; // list entry bdirectional list of irp ops
+	KSPIN_LOCK irpOpsLock; // lock for irp list ops
+	
+	ULONG directoryRootsSize;  // number of protected dirs in list
+	LIST_ENTRY rootDirectories;  // list entry bdirectional of protected dirs
+	KSPIN_LOCK directoriesSpinLock; // lock for directory list 
 
-	ULONGLONG GidCounter;
-	HashMap GidToPids; // list entry of pids
-	HashMap PidToGids;
-	ULONGLONG gidsSize;
-	LIST_ENTRY GidsList;
-	KSPIN_LOCK PIDRecordsLock;
+	/* GID system data members */
+	ULONGLONG GidCounter; // interal counter for gid, every new application recieves a new gid
+	HashMap GidToPids; // mapping from gid to pids
+	HashMap PidToGids; // mapping from pid to gid
+	ULONGLONG gidsSize; // number of gids currently active
+	LIST_ENTRY GidsList;  // list entry of gids, used to clear memory 
+	KSPIN_LOCK GIDSystemLock;
 
 
 private:
-	// call assumes protected code
+	// call assumes protected code - high IRQL
 	BOOLEAN RemoveProcessRecordAux(ULONG ProcessId, ULONGLONG gid);
 
-	// call assumes protected code
+	// call assumes protected code - high IRQL
 	BOOLEAN RemoveGidRecordAux(PGID_ENTRY gidRecord);
 
 public:
+
+	// c'tor init D.S.
 	explicit DriverData(PDRIVER_OBJECT DriverObject);
 	
 	~DriverData();
@@ -43,23 +50,27 @@ public:
 		return systemRootPath;
 	}
 
+	// sets the system root path, received from user mode application, we copy the systemRootPath sent on the message
 	VOID setSystemRootPath(PWCHAR setsystemRootPath) {
 		RtlZeroBytes(systemRootPath, MAX_FILE_NAME_SIZE);
 		RtlCopyBytes(systemRootPath, setsystemRootPath, MAX_FILE_NAME_LENGTH);
 		RtlCopyBytes(systemRootPath + wcsnlen(systemRootPath, MAX_FILE_NAME_LENGTH / 2), L"\\Windows", wcsnlen(L"\\Windows", MAX_FILE_NAME_LENGTH / 2));
-		//CopyWString(systemRootPath, setSystemRootPath, MAX_FILE_NAME_LENGTH);
-		//CopyWString(systemRootPath + wcsnlen(systemRootPath, MAX_FILE_NAME_LENGTH / 2), L"\\Windows", MAX_FILE_NAME_LENGTH);
 		DbgPrint("Set system root path %ls\n", systemRootPath);
 	}
 
+	// remove a process which ended from the GID system, function raise IRQL
 	BOOLEAN RemoveProcess(ULONG ProcessId);
 
+	// record a process which was created to the GID system, function raise IRQL
 	BOOLEAN RecordNewProcess(PUNICODE_STRING ProcessName, ULONG ProcessId, ULONG ParentPid);
 
+	// removed a gid from the system, function raise IRQL
 	BOOLEAN RemoveGid(ULONGLONG gid);
 
+	// gets the number of processes in a gid, function raise IRQL
 	ULONGLONG GetGidSize(ULONGLONG gid, PBOOLEAN found);
 
+	// help function, recieves a buffer and returns an array of pids, returns true only if all pids are restored
 	BOOLEAN GetGidPids(ULONGLONG gid, PULONG buffer, ULONGLONG bufferSize, PULONGLONG returnedLength);
 
 	// if found return true on found else return false
@@ -87,6 +98,7 @@ public:
 	ULONG getPID() { return pid; }
 	ULONG setPID(ULONG Pid) { pid = Pid; return Pid; }
 
+	// clears all irps waiting to report, function raise IRQL
 	VOID ClearIrps();
 
 	ULONG IrpSize();
@@ -97,6 +109,7 @@ public:
 
 	PIRP_ENTRY GetFirstIrpMessage();
 
+	// Takes Irps from the driverData and copy them to a buffer, also copies the file names on which the irp occured, function raise IRQL
 	VOID DriverGetIrps(PVOID Buffer, ULONG BufferSize, PULONG ReturnOutputBufferLength);
 
 	LIST_ENTRY GetAllEntries();
