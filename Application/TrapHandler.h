@@ -15,6 +15,7 @@ namespace fs = std::filesystem;
 
 constexpr ULONGLONG MAX_FILE_BUFFER_SIZE = 0x2FF0FFF;
 
+// handles traps creation in application, also handles clearing traps when removing a directory
 class TrapHandler
 {
 private:

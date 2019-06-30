@@ -17,7 +17,7 @@ DriverData::DriverData(PDRIVER_OBJECT DriverObject) :
 	KeInitializeSpinLock(&directoriesSpinLock); //init spin lock
 	
 	GidCounter = 0;
-	KeInitializeSpinLock(&PIDRecordsLock); //init spin lock
+	KeInitializeSpinLock(&GIDSystemLock); //init spin lock
 	gidsSize = 0;
 	InitializeListHead(&GidsList);
 }
@@ -64,9 +64,6 @@ BOOLEAN DriverData::RemoveProcessRecordAux(ULONG ProcessId, ULONGLONG gid) {
 			gidsSize--;
 			delete gidRecord;
 		}
-		//else { // TODO: can remove
-		//	GidToPids.insertNode(gid, gidRecord);
-		//}
 		PidToGids.deleteNode(ProcessId);
 	}
 	return ret;
@@ -98,34 +95,23 @@ BOOLEAN DriverData::RemoveGidRecordAux(PGID_ENTRY gidRecord) {
 
 BOOLEAN DriverData::RemoveProcess(ULONG ProcessId) {
 	BOOLEAN ret = FALSE;
-	//ULONGLONG sizePids = 0;
-	//ULONGLONG sizeGids = 0;
 	KIRQL irql = KeGetCurrentIrql();
-	KeAcquireSpinLock(&PIDRecordsLock, &irql);
+	KeAcquireSpinLock(&GIDSystemLock, &irql);
 	ULONGLONG gid = (ULONGLONG)PidToGids.get(ProcessId);
 	if (gid) { // there is Gid
 		ret = RemoveProcessRecordAux(ProcessId, gid);
 	}
-	//sizePids = PidToGids.sizeofMap();
-	//sizeGids = GidToPids.sizeofMap();
 
-	KeReleaseSpinLock(&PIDRecordsLock, irql);
-	//DbgPrint("PidToGids size: %d\n", sizePids);
-	//DbgPrint("sizeGids size: %d\n", sizeGids);
+	KeReleaseSpinLock(&GIDSystemLock, irql);
 	return ret;
 }
 
 BOOLEAN DriverData::RecordNewProcess(PUNICODE_STRING ProcessName, ULONG ProcessId, ULONG ParentPid) {
-	UNREFERENCED_PARAMETER(ProcessName);
-	UNREFERENCED_PARAMETER(ProcessId);
-	UNREFERENCED_PARAMETER(ParentPid);
 	BOOLEAN ret = FALSE;
 	KIRQL irql = KeGetCurrentIrql();
-	//ULONGLONG sizePids = 0;
-	//ULONGLONG sizeGids = 0;
-	KeAcquireSpinLock(&PIDRecordsLock, &irql);
+	KeAcquireSpinLock(&GIDSystemLock, &irql);
 	ULONGLONG gid = (ULONGLONG)PidToGids.get(ParentPid);
-	PPID_ENTRY pStrct = new PID_ENTRY; // fixme add UNICODE STRING and update pid value
+	PPID_ENTRY pStrct = new PID_ENTRY;
 	pStrct->Pid = ProcessId;
 	pStrct->Path = ProcessName;
 	if (gid) { // there is Gid
@@ -136,7 +122,6 @@ BOOLEAN DriverData::RecordNewProcess(PUNICODE_STRING ProcessName, ULONG ProcessI
 		PGID_ENTRY gidRecord = (PGID_ENTRY)GidToPids.get(gid);
 		InsertHeadList(&(gidRecord->HeadListPids), &(pStrct->entry));
 		gidRecord->pidsSize++;
-		//GidToPids.insertNode(gid, gidRecord);
 		PidToGids.insertNode(ProcessId, (HANDLE)gid);
 	}
 	else {
@@ -148,20 +133,14 @@ BOOLEAN DriverData::RecordNewProcess(PUNICODE_STRING ProcessName, ULONG ProcessI
 		newGidRecord->pidsSize++;
 		gidsSize++;
 	}
-	//sizePids = PidToGids.sizeofMap();
-	//sizeGids = GidToPids.sizeofMap();
-	KeReleaseSpinLock(&PIDRecordsLock, irql);
-	//DbgPrint("PidToGids size: %d\n", sizePids);
-	//DbgPrint("sizeGids size: %d\n", sizeGids);
+	KeReleaseSpinLock(&GIDSystemLock, irql);
 	return ret;
 }
 
 BOOLEAN DriverData::RemoveGid(ULONGLONG gid) {
 	BOOLEAN ret = FALSE;
-	//ULONGLONG sizePids = 0;
-	//ULONGLONG sizeGids = 0;
 	KIRQL irql = KeGetCurrentIrql();
-	KeAcquireSpinLock(&PIDRecordsLock, &irql);
+	KeAcquireSpinLock(&GIDSystemLock, &irql);
 	PGID_ENTRY gidRecord = (PGID_ENTRY)GidToPids.get(gid);
 	if (gidRecord) { // there is Gid list
 		RemoveGidRecordAux(gidRecord); //clear process list
@@ -171,12 +150,8 @@ BOOLEAN DriverData::RemoveGid(ULONGLONG gid) {
 		delete gidRecord;
 		ret = TRUE;
 	}
-	//sizePids = PidToGids.sizeofMap();
-	//sizeGids = GidToPids.sizeofMap();
 
-	KeReleaseSpinLock(&PIDRecordsLock, irql);
-	//DbgPrint("PidToGids size: %d\n", sizePids);
-	//DbgPrint("sizeGids size: %d\n", sizeGids);
+	KeReleaseSpinLock(&GIDSystemLock, irql);
 	return ret;
 }
 
@@ -185,13 +160,13 @@ ULONGLONG DriverData::GetGidSize(ULONGLONG gid, PBOOLEAN found) {
 	*found = FALSE;
 	ULONGLONG ret = 0;
 	KIRQL irql = KeGetCurrentIrql();
-	KeAcquireSpinLock(&PIDRecordsLock, &irql);
+	KeAcquireSpinLock(&GIDSystemLock, &irql);
 	PGID_ENTRY GidRecord = (PGID_ENTRY)GidToPids.get(gid);
 	if (GidRecord != nullptr) {  // there is such Gid
 		*found = TRUE;
 		ret = GidRecord->pidsSize;
 	}
-	KeReleaseSpinLock(&PIDRecordsLock, irql);
+	KeReleaseSpinLock(&GIDSystemLock, irql);
 	return ret;
 }
 
@@ -203,7 +178,7 @@ BOOLEAN DriverData::GetGidPids(ULONGLONG gid, PULONG buffer, ULONGLONG bufferSiz
 	ULONGLONG pidsSize =  0;
 	ULONGLONG pidsIter = 0;
 	KIRQL irql = KeGetCurrentIrql();
-	KeAcquireSpinLock(&PIDRecordsLock, &irql);
+	KeAcquireSpinLock(&GIDSystemLock, &irql);
 	PGID_ENTRY GidRecord = (PGID_ENTRY)GidToPids.get(gid);
 	if (GidRecord != nullptr) {  // there is such Gid
 		pidsSize = GidRecord->pidsSize;
@@ -219,7 +194,7 @@ BOOLEAN DriverData::GetGidPids(ULONGLONG gid, PULONG buffer, ULONGLONG bufferSiz
 			iterator = iterator->Flink;
 		}
 	}
-	KeReleaseSpinLock(&PIDRecordsLock, irql);
+	KeReleaseSpinLock(&GIDSystemLock, irql);
 	if (GidRecord == nullptr) {
 		return FALSE;
 	}
@@ -235,10 +210,10 @@ ULONGLONG DriverData::GetProcessGid(ULONG ProcessId, PBOOLEAN found) {
 	*found = FALSE;
 	ULONGLONG ret = 0;
 	KIRQL irql = KeGetCurrentIrql();
-	KeAcquireSpinLock(&PIDRecordsLock, &irql);
+	KeAcquireSpinLock(&GIDSystemLock, &irql);
 	ret = (ULONGLONG)PidToGids.get(ProcessId);
 	if (ret)* found = TRUE;
-	KeReleaseSpinLock(&PIDRecordsLock, irql);
+	KeReleaseSpinLock(&GIDSystemLock, irql);
 	//DbgPrint("Gid: %d %d\n", ret, *found);
 	return ret;
 }
@@ -246,7 +221,7 @@ ULONGLONG DriverData::GetProcessGid(ULONG ProcessId, PBOOLEAN found) {
 //clear all data related to Gid system
 VOID DriverData::ClearGidsPids() {
 	KIRQL irql = KeGetCurrentIrql();
-	KeAcquireSpinLock(&PIDRecordsLock, &irql);
+	KeAcquireSpinLock(&GIDSystemLock, &irql);
 	PLIST_ENTRY headGids = &GidsList;
 	PLIST_ENTRY iterator = headGids->Flink;
 	while (iterator != headGids) { // clear list
@@ -260,15 +235,15 @@ VOID DriverData::ClearGidsPids() {
 	}
 	//ASSERT(headGids->Flink == headGids);
 	GidCounter = 0;
-	KeReleaseSpinLock(&PIDRecordsLock, irql);
+	KeReleaseSpinLock(&GIDSystemLock, irql);
 }
 
 ULONGLONG DriverData::GidsSize() {
 	ULONGLONG ret = 0;
 	KIRQL irql = KeGetCurrentIrql();
-	KeAcquireSpinLock(&PIDRecordsLock, &irql);
+	KeAcquireSpinLock(&GIDSystemLock, &irql);
 	ret = gidsSize;
-	KeReleaseSpinLock(&PIDRecordsLock, irql);
+	KeReleaseSpinLock(&GIDSystemLock, irql);
 	return ret;
 }
 
