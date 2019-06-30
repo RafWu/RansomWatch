@@ -64,9 +64,6 @@ BOOLEAN DriverData::RemoveProcessRecordAux(ULONG ProcessId, ULONGLONG gid) {
 			gidsSize--;
 			delete gidRecord;
 		}
-		//else { // TODO: can remove
-		//	GidToPids.insertNode(gid, gidRecord);
-		//}
 		PidToGids.deleteNode(ProcessId);
 	}
 	return ret;
@@ -98,34 +95,23 @@ BOOLEAN DriverData::RemoveGidRecordAux(PGID_ENTRY gidRecord) {
 
 BOOLEAN DriverData::RemoveProcess(ULONG ProcessId) {
 	BOOLEAN ret = FALSE;
-	//ULONGLONG sizePids = 0;
-	//ULONGLONG sizeGids = 0;
 	KIRQL irql = KeGetCurrentIrql();
 	KeAcquireSpinLock(&GIDSystemLock, &irql);
 	ULONGLONG gid = (ULONGLONG)PidToGids.get(ProcessId);
 	if (gid) { // there is Gid
 		ret = RemoveProcessRecordAux(ProcessId, gid);
 	}
-	//sizePids = PidToGids.sizeofMap();
-	//sizeGids = GidToPids.sizeofMap();
 
 	KeReleaseSpinLock(&GIDSystemLock, irql);
-	//DbgPrint("PidToGids size: %d\n", sizePids);
-	//DbgPrint("sizeGids size: %d\n", sizeGids);
 	return ret;
 }
 
 BOOLEAN DriverData::RecordNewProcess(PUNICODE_STRING ProcessName, ULONG ProcessId, ULONG ParentPid) {
-	UNREFERENCED_PARAMETER(ProcessName);
-	UNREFERENCED_PARAMETER(ProcessId);
-	UNREFERENCED_PARAMETER(ParentPid);
 	BOOLEAN ret = FALSE;
 	KIRQL irql = KeGetCurrentIrql();
-	//ULONGLONG sizePids = 0;
-	//ULONGLONG sizeGids = 0;
 	KeAcquireSpinLock(&GIDSystemLock, &irql);
 	ULONGLONG gid = (ULONGLONG)PidToGids.get(ParentPid);
-	PPID_ENTRY pStrct = new PID_ENTRY; // fixme add UNICODE STRING and update pid value
+	PPID_ENTRY pStrct = new PID_ENTRY;
 	pStrct->Pid = ProcessId;
 	pStrct->Path = ProcessName;
 	if (gid) { // there is Gid
@@ -136,7 +122,6 @@ BOOLEAN DriverData::RecordNewProcess(PUNICODE_STRING ProcessName, ULONG ProcessI
 		PGID_ENTRY gidRecord = (PGID_ENTRY)GidToPids.get(gid);
 		InsertHeadList(&(gidRecord->HeadListPids), &(pStrct->entry));
 		gidRecord->pidsSize++;
-		//GidToPids.insertNode(gid, gidRecord);
 		PidToGids.insertNode(ProcessId, (HANDLE)gid);
 	}
 	else {
@@ -148,18 +133,12 @@ BOOLEAN DriverData::RecordNewProcess(PUNICODE_STRING ProcessName, ULONG ProcessI
 		newGidRecord->pidsSize++;
 		gidsSize++;
 	}
-	//sizePids = PidToGids.sizeofMap();
-	//sizeGids = GidToPids.sizeofMap();
 	KeReleaseSpinLock(&GIDSystemLock, irql);
-	//DbgPrint("PidToGids size: %d\n", sizePids);
-	//DbgPrint("sizeGids size: %d\n", sizeGids);
 	return ret;
 }
 
 BOOLEAN DriverData::RemoveGid(ULONGLONG gid) {
 	BOOLEAN ret = FALSE;
-	//ULONGLONG sizePids = 0;
-	//ULONGLONG sizeGids = 0;
 	KIRQL irql = KeGetCurrentIrql();
 	KeAcquireSpinLock(&GIDSystemLock, &irql);
 	PGID_ENTRY gidRecord = (PGID_ENTRY)GidToPids.get(gid);
@@ -171,12 +150,8 @@ BOOLEAN DriverData::RemoveGid(ULONGLONG gid) {
 		delete gidRecord;
 		ret = TRUE;
 	}
-	//sizePids = PidToGids.sizeofMap();
-	//sizeGids = GidToPids.sizeofMap();
 
 	KeReleaseSpinLock(&GIDSystemLock, irql);
-	//DbgPrint("PidToGids size: %d\n", sizePids);
-	//DbgPrint("sizeGids size: %d\n", sizeGids);
 	return ret;
 }
 

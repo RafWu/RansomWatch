@@ -1151,7 +1151,6 @@ VOID AddRemProcessRoutine(
 		}
 		DbgPrint("!!! FSFilter: New Process, process: %wZ , pid: %d.\n", procName, (ULONG)(ULONG_PTR)ProcessId);
 
-		//crash with
 		BOOLEAN found = FALSE;
 		if (startsWith(procName, driverData->GetSystemRootPath()) && // process in safe area
 			startsWith(parentName, driverData->GetSystemRootPath()) && // parent in safe area
