@@ -26,7 +26,7 @@ using namespace System::Threading::Tasks;
 
 ref class BackupService
 {
-// FIXME: storageConnectionString should be encrypted
+// FIXME: storageConnectionString should be encrypted, change this string to a valid Azure storage string
 private: CloudStorageAccount^ storageAccount;
 private: CloudBlobClient^ blobClient;
 private: CloudBlobContainer^ container;
