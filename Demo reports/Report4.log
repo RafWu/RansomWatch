@@ -1,0 +1,54 @@
+RansomWatch report file
+Files report for ransomware running from exe: C:\Users\rafwu\Desktop\wannacry1.exe
+Process started on time: 6/25/2019 6:23:25 PM
+Time report: 6/25/2019 6:23:28 PM
+Process has been killed
+Pids found:
+3856 7264 7328 9428 
+
+Changed files: 13
+C:\Users\rafwu\Desktop\data\2331M - Copy - Copy - Copy.vsdx
+C:\Users\rafwu\Desktop\data\2331M - Copy - Copy.vsdx
+C:\Users\rafwu\Desktop\data\2331M - Copy.vsdx
+C:\Users\rafwu\Desktop\data\2331M.vsdx
+C:\Users\rafwu\Desktop\data\4UAIDTASR9 - Copy - Copy - Copy.ppt
+C:\Users\rafwu\Desktop\data\4UAIDTASR9 - Copy - Copy.ppt
+C:\Users\rafwu\Desktop\data\4UAIDTASR9 - Copy.ppt
+C:\Users\rafwu\Desktop\data\4UAIDTASR9.ppt
+C:\Users\rafwu\Desktop\data\6Ak4okg.ppt
+C:\Users\rafwu\Desktop\data\6JS5H - Copy - Copy - Copy.jpeg
+C:\Users\rafwu\Desktop\data\6JS5H - Copy - Copy.jpeg
+C:\Users\rafwu\Desktop\data\6JS5H - Copy.jpeg
+C:\Users\rafwu\Desktop\data\6JS5H.jpeg
+Created files: 14
+C:\Users\rafwu\Desktop\data\~SDA170.tmp
+C:\Users\rafwu\Desktop\data\2331M - Copy - Copy - Copy.vsdx.WNCRYT
+C:\Users\rafwu\Desktop\data\2331M - Copy - Copy.vsdx.WNCRYT
+C:\Users\rafwu\Desktop\data\2331M - Copy.vsdx.WNCRYT
+C:\Users\rafwu\Desktop\data\2331M.vsdx.WNCRYT
+C:\Users\rafwu\Desktop\data\4UAIDTASR9 - Copy - Copy - Copy.ppt.WNCRYT
+C:\Users\rafwu\Desktop\data\4UAIDTASR9 - Copy - Copy.ppt.WNCRYT
+C:\Users\rafwu\Desktop\data\4UAIDTASR9 - Copy.ppt.WNCRYT
+C:\Users\rafwu\Desktop\data\4UAIDTASR9.ppt.WNCRYT
+C:\Users\rafwu\Desktop\data\6Ak4okg.ppt.WNCRYT
+C:\Users\rafwu\Desktop\data\6JS5H - Copy - Copy - Copy.jpeg.WNCRYT
+C:\Users\rafwu\Desktop\data\6JS5H - Copy - Copy.jpeg.WNCRYT
+C:\Users\rafwu\Desktop\data\6JS5H - Copy.jpeg.WNCRYT
+C:\Users\rafwu\Desktop\data\6JS5H.jpeg.WNCRYT
+
+Restore result:
+C:\Users\rafwu\Desktop\data\2331M - Copy - Copy - Copy.vsdx - restored file
+C:\Users\rafwu\Desktop\data\2331M - Copy - Copy.vsdx - restored file
+C:\Users\rafwu\Desktop\data\2331M - Copy.vsdx - restored file
+C:\Users\rafwu\Desktop\data\2331M.vsdx - restored file
+C:\Users\rafwu\Desktop\data\4UAIDTASR9 - Copy - Copy - Copy.ppt - restored file
+C:\Users\rafwu\Desktop\data\4UAIDTASR9 - Copy - Copy.ppt - restored file
+C:\Users\rafwu\Desktop\data\4UAIDTASR9 - Copy.ppt - restored file
+C:\Users\rafwu\Desktop\data\4UAIDTASR9.ppt - restored file
+C:\Users\rafwu\Desktop\data\6Ak4okg.ppt - trap file, not restored
+C:\Users\rafwu\Desktop\data\6JS5H - Copy - Copy - Copy.jpeg - restored file
+C:\Users\rafwu\Desktop\data\6JS5H - Copy - Copy.jpeg - restored file
+C:\Users\rafwu\Desktop\data\6JS5H - Copy.jpeg - restored file
+C:\Users\rafwu\Desktop\data\6JS5H.jpeg - failed to restore file
+
+End file

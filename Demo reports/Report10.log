@@ -1,0 +1,68 @@
+RansomWatch report file
+Files report for ransomware running from exe: C:\Users\rafwu\Desktop\Vipasana3.exe
+Process started on time: 6/25/2019 6:41:17 PM
+Time report: 6/25/2019 6:43:47 PM
+Process has been killed
+Pids found:
+4880 7524 
+
+Changed files: 27
+C:\Users\rafwu\Desktop\data\1B6KSL\ENBXVJQOFV.txt
+C:\Users\rafwu\Desktop\data\1B6KSL\gpibhpdv1H.txt
+C:\Users\rafwu\Desktop\data\31RZ2X2L4\ahdqOENry.docx
+C:\Users\rafwu\Desktop\data\31RZ2X2L4\AYPGYZ.7z
+C:\Users\rafwu\Desktop\data\31RZ2X2L4\BD7W37Z9.jpeg
+C:\Users\rafwu\Desktop\data\31RZ2X2L4\E69GP.jpeg
+C:\Users\rafwu\Desktop\data\31RZ2X2L4\HUJ60MJ57.docx
+C:\Users\rafwu\Desktop\data\31RZ2X2L4\JJ2QD.zip
+C:\Users\rafwu\Desktop\data\31RZ2X2L4\LGZ3U7P5\26KERRDQ5\ljqdN.doc
+C:\Users\rafwu\Desktop\data\31RZ2X2L4\LGZ3U7P5\26KERRDQ5\TXVK4A.doc
+C:\Users\rafwu\Desktop\data\31RZ2X2L4\LGZ3U7P5\4L4NRHF.doc
+C:\Users\rafwu\Desktop\data\31RZ2X2L4\LGZ3U7P5\4SJPB\464Y5KCT.xlsx
+C:\Users\rafwu\Desktop\data\31RZ2X2L4\LGZ3U7P5\4SJPB\4YI4S9DC.pdf
+C:\Users\rafwu\Desktop\data\31RZ2X2L4\LGZ3U7P5\4SJPB\bh8lR4QaDSV4D.7z
+C:\Users\rafwu\Desktop\data\31RZ2X2L4\LGZ3U7P5\4SJPB\HCMZCMP.doc
+C:\Users\rafwu\Desktop\data\31RZ2X2L4\LGZ3U7P5\4SJPB\ifZ4Leh7HpS.xlsx
+C:\Users\rafwu\Desktop\data\31RZ2X2L4\LGZ3U7P5\4SJPB\JQDHLPA0.7z
+C:\Users\rafwu\Desktop\data\31RZ2X2L4\LGZ3U7P5\4SJPB\N5QH7E3XW4.pdf
+C:\Users\rafwu\Desktop\data\31RZ2X2L4\LGZ3U7P5\4SJPB\ne8QP65.pdf
+C:\Users\rafwu\Desktop\data\31RZ2X2L4\LGZ3U7P5\4SJPB\WwPtm.xls
+C:\Users\rafwu\Desktop\data\31RZ2X2L4\LGZ3U7P5\4SJPB\YASBSLTZU.xls
+C:\Users\rafwu\Desktop\data\31RZ2X2L4\LGZ3U7P5\4SJPB\zAuCc5dkJTLFh.doc
+C:\Users\rafwu\Desktop\data\31RZ2X2L4\LGZ3U7P5\BNHICF.jpg
+C:\Users\rafwu\Desktop\data\31RZ2X2L4\LGZ3U7P5\EI3UT.jpeg
+C:\Users\rafwu\Desktop\data\31RZ2X2L4\LGZ3U7P5\KE5BEQ.pst
+C:\Users\rafwu\Desktop\data\31RZ2X2L4\LGZ3U7P5\ojIeaGaXU6.jpg
+C:\Users\rafwu\Desktop\data\31RZ2X2L4\LGZ3U7P5\QQV9VunSPw.doc
+Created files: 0
+
+Restore result:
+C:\Users\rafwu\Desktop\data\1B6KSL\ENBXVJQOFV.txt - restored file
+C:\Users\rafwu\Desktop\data\1B6KSL\gpibhpdv1H.txt - trap file, not restored
+C:\Users\rafwu\Desktop\data\31RZ2X2L4\ahdqOENry.docx - trap file, not restored
+C:\Users\rafwu\Desktop\data\31RZ2X2L4\AYPGYZ.7z - restored file
+C:\Users\rafwu\Desktop\data\31RZ2X2L4\BD7W37Z9.jpeg - restored file
+C:\Users\rafwu\Desktop\data\31RZ2X2L4\E69GP.jpeg - restored file
+C:\Users\rafwu\Desktop\data\31RZ2X2L4\HUJ60MJ57.docx - restored file
+C:\Users\rafwu\Desktop\data\31RZ2X2L4\JJ2QD.zip - restored file
+C:\Users\rafwu\Desktop\data\31RZ2X2L4\LGZ3U7P5\26KERRDQ5\ljqdN.doc - trap file, not restored
+C:\Users\rafwu\Desktop\data\31RZ2X2L4\LGZ3U7P5\26KERRDQ5\TXVK4A.doc - restored file
+C:\Users\rafwu\Desktop\data\31RZ2X2L4\LGZ3U7P5\4L4NRHF.doc - restored file
+C:\Users\rafwu\Desktop\data\31RZ2X2L4\LGZ3U7P5\4SJPB\464Y5KCT.xlsx - restored file
+C:\Users\rafwu\Desktop\data\31RZ2X2L4\LGZ3U7P5\4SJPB\4YI4S9DC.pdf - restored file
+C:\Users\rafwu\Desktop\data\31RZ2X2L4\LGZ3U7P5\4SJPB\bh8lR4QaDSV4D.7z - trap file, not restored
+C:\Users\rafwu\Desktop\data\31RZ2X2L4\LGZ3U7P5\4SJPB\HCMZCMP.doc - restored file
+C:\Users\rafwu\Desktop\data\31RZ2X2L4\LGZ3U7P5\4SJPB\ifZ4Leh7HpS.xlsx - trap file, not restored
+C:\Users\rafwu\Desktop\data\31RZ2X2L4\LGZ3U7P5\4SJPB\JQDHLPA0.7z - restored file
+C:\Users\rafwu\Desktop\data\31RZ2X2L4\LGZ3U7P5\4SJPB\N5QH7E3XW4.pdf - restored file
+C:\Users\rafwu\Desktop\data\31RZ2X2L4\LGZ3U7P5\4SJPB\ne8QP65.pdf - trap file, not restored
+C:\Users\rafwu\Desktop\data\31RZ2X2L4\LGZ3U7P5\4SJPB\WwPtm.xls - trap file, not restored
+C:\Users\rafwu\Desktop\data\31RZ2X2L4\LGZ3U7P5\4SJPB\YASBSLTZU.xls - restored file
+C:\Users\rafwu\Desktop\data\31RZ2X2L4\LGZ3U7P5\4SJPB\zAuCc5dkJTLFh.doc - trap file, not restored
+C:\Users\rafwu\Desktop\data\31RZ2X2L4\LGZ3U7P5\BNHICF.jpg - restored file
+C:\Users\rafwu\Desktop\data\31RZ2X2L4\LGZ3U7P5\EI3UT.jpeg - restored file
+C:\Users\rafwu\Desktop\data\31RZ2X2L4\LGZ3U7P5\KE5BEQ.pst - restored file
+C:\Users\rafwu\Desktop\data\31RZ2X2L4\LGZ3U7P5\ojIeaGaXU6.jpg - trap file, not restored
+C:\Users\rafwu\Desktop\data\31RZ2X2L4\LGZ3U7P5\QQV9VunSPw.doc - trap file, not restored
+
+End file

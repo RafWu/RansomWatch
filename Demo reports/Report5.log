@@ -1,0 +1,225 @@
+RansomWatch report file
+Files report for ransomware running from exe: C:\Users\rafwu\Desktop\jigsaw.exe
+Process started on time: 6/25/2019 6:24:45 PM
+Time report: 6/25/2019 6:25:08 PM
+Process has been killed
+Pids found:
+3364 7464 
+
+Changed files: 70
+C:\Users\rafwu\Desktop\data\1KRFRBL - Copy - Copy - Copy.png
+C:\Users\rafwu\Desktop\data\1KRFRBL - Copy - Copy.png
+C:\Users\rafwu\Desktop\data\1KRFRBL - Copy.png
+C:\Users\rafwu\Desktop\data\1KRFRBL.png
+C:\Users\rafwu\Desktop\data\3GS60G - Copy - Copy - Copy.gif
+C:\Users\rafwu\Desktop\data\3GS60G - Copy - Copy.gif
+C:\Users\rafwu\Desktop\data\3GS60G - Copy.gif
+C:\Users\rafwu\Desktop\data\3GS60G.gif
+C:\Users\rafwu\Desktop\data\45Q29V - Copy - Copy - Copy.zip
+C:\Users\rafwu\Desktop\data\45Q29V - Copy - Copy.zip
+C:\Users\rafwu\Desktop\data\45Q29V - Copy.zip
+C:\Users\rafwu\Desktop\data\45Q29V.zip
+C:\Users\rafwu\Desktop\data\4UAIDTASR9 - Copy - Copy - Copy.ppt
+C:\Users\rafwu\Desktop\data\4UAIDTASR9 - Copy - Copy.ppt
+C:\Users\rafwu\Desktop\data\4UAIDTASR9 - Copy.ppt
+C:\Users\rafwu\Desktop\data\4UAIDTASR9.ppt
+C:\Users\rafwu\Desktop\data\67T8KJ34 - Copy - Copy - Copy.gif
+C:\Users\rafwu\Desktop\data\67T8KJ34 - Copy - Copy.gif
+C:\Users\rafwu\Desktop\data\67T8KJ34 - Copy.gif
+C:\Users\rafwu\Desktop\data\67T8KJ34.gif
+C:\Users\rafwu\Desktop\data\6Ak4okg.ppt
+C:\Users\rafwu\Desktop\data\6JS5H - Copy - Copy - Copy.jpeg
+C:\Users\rafwu\Desktop\data\6JS5H - Copy - Copy.jpeg
+C:\Users\rafwu\Desktop\data\6JS5H - Copy.jpeg
+C:\Users\rafwu\Desktop\data\6JS5H.jpeg
+C:\Users\rafwu\Desktop\data\6pZz9OUhZxqz.gif
+C:\Users\rafwu\Desktop\data\7GBR7 - Copy - Copy - Copy.jpeg
+C:\Users\rafwu\Desktop\data\7GBR7 - Copy - Copy.jpeg
+C:\Users\rafwu\Desktop\data\7GBR7 - Copy.jpeg
+C:\Users\rafwu\Desktop\data\7GBR7.jpeg
+C:\Users\rafwu\Desktop\data\7YNV6 - Copy - Copy - Copy.rar
+C:\Users\rafwu\Desktop\data\7YNV6 - Copy - Copy.rar
+C:\Users\rafwu\Desktop\data\7YNV6 - Copy.rar
+C:\Users\rafwu\Desktop\data\7YNV6.rar
+C:\Users\rafwu\Desktop\data\8S5719V - Copy - Copy - Copy.jpeg
+C:\Users\rafwu\Desktop\data\8S5719V - Copy - Copy.jpeg
+C:\Users\rafwu\Desktop\data\8S5719V - Copy.jpeg
+C:\Users\rafwu\Desktop\data\8S5719V.jpeg
+C:\Users\rafwu\Desktop\data\9CZWUW - Copy - Copy - Copy.cpp
+C:\Users\rafwu\Desktop\data\9CZWUW - Copy - Copy.cpp
+C:\Users\rafwu\Desktop\data\9CZWUW - Copy.cpp
+C:\Users\rafwu\Desktop\data\9CZWUW.cpp
+C:\Users\rafwu\Desktop\data\9M0HTJZ - Copy - Copy - Copy.gif
+C:\Users\rafwu\Desktop\data\9M0HTJZ - Copy - Copy.gif
+C:\Users\rafwu\Desktop\data\9M0HTJZ - Copy.gif
+C:\Users\rafwu\Desktop\data\9M0HTJZ.gif
+C:\Users\rafwu\Desktop\data\AY4O0I - Copy - Copy - Copy.zip
+C:\Users\rafwu\Desktop\data\AY4O0I - Copy - Copy.zip
+C:\Users\rafwu\Desktop\data\AY4O0I - Copy.zip
+C:\Users\rafwu\Desktop\data\AY4O0I.zip
+C:\Users\rafwu\Desktop\data\B0PY6BBQ - Copy - Copy - Copy.xlsx
+C:\Users\rafwu\Desktop\data\B0PY6BBQ - Copy - Copy.xlsx
+C:\Users\rafwu\Desktop\data\B0PY6BBQ - Copy.xlsx
+C:\Users\rafwu\Desktop\data\B0PY6BBQ.xlsx
+C:\Users\rafwu\Desktop\data\BThx5lMF.cpp
+C:\Users\rafwu\Desktop\data\DHM9AH0IQ9 - Copy - Copy - Copy.c
+C:\Users\rafwu\Desktop\data\DHM9AH0IQ9 - Copy - Copy.c
+C:\Users\rafwu\Desktop\data\DHM9AH0IQ9 - Copy.c
+C:\Users\rafwu\Desktop\data\DHM9AH0IQ9.c
+C:\Users\rafwu\Desktop\data\GKXC2 - Copy - Copy - Copy.rar
+C:\Users\rafwu\Desktop\data\GKXC2 - Copy - Copy.rar
+C:\Users\rafwu\Desktop\data\GKXC2 - Copy.rar
+C:\Users\rafwu\Desktop\data\GKXC2.rar
+C:\Users\rafwu\Desktop\data\HNDZT.c
+C:\Users\rafwu\Desktop\data\ISI25HSD - Copy - Copy - Copy.txt
+C:\Users\rafwu\Desktop\data\ISI25HSD - Copy - Copy.txt
+C:\Users\rafwu\Desktop\data\ISI25HSD - Copy.txt
+C:\Users\rafwu\Desktop\data\ISI25HSD.txt
+C:\Users\rafwu\Desktop\data\JDJzVzjVrNac.pdf
+C:\Users\rafwu\Desktop\data\JlM7hAH9Cd.xls
+Created files: 71
+C:\Users\rafwu\Desktop\data\1KRFRBL - Copy - Copy - Copy.png.fun
+C:\Users\rafwu\Desktop\data\1KRFRBL - Copy - Copy.png.fun
+C:\Users\rafwu\Desktop\data\1KRFRBL - Copy.png.fun
+C:\Users\rafwu\Desktop\data\1KRFRBL.png.fun
+C:\Users\rafwu\Desktop\data\3GS60G - Copy - Copy - Copy.gif.fun
+C:\Users\rafwu\Desktop\data\3GS60G - Copy - Copy.gif.fun
+C:\Users\rafwu\Desktop\data\3GS60G - Copy.gif.fun
+C:\Users\rafwu\Desktop\data\3GS60G.gif.fun
+C:\Users\rafwu\Desktop\data\45Q29V - Copy - Copy - Copy.zip.fun
+C:\Users\rafwu\Desktop\data\45Q29V - Copy - Copy.zip.fun
+C:\Users\rafwu\Desktop\data\45Q29V - Copy.zip.fun
+C:\Users\rafwu\Desktop\data\45Q29V.zip.fun
+C:\Users\rafwu\Desktop\data\4UAIDTASR9 - Copy - Copy - Copy.ppt.fun
+C:\Users\rafwu\Desktop\data\4UAIDTASR9 - Copy - Copy.ppt.fun
+C:\Users\rafwu\Desktop\data\4UAIDTASR9 - Copy.ppt.fun
+C:\Users\rafwu\Desktop\data\4UAIDTASR9.ppt.fun
+C:\Users\rafwu\Desktop\data\67T8KJ34 - Copy - Copy - Copy.gif.fun
+C:\Users\rafwu\Desktop\data\67T8KJ34 - Copy - Copy.gif.fun
+C:\Users\rafwu\Desktop\data\67T8KJ34 - Copy.gif.fun
+C:\Users\rafwu\Desktop\data\67T8KJ34.gif.fun
+C:\Users\rafwu\Desktop\data\6Ak4okg.ppt.fun
+C:\Users\rafwu\Desktop\data\6JS5H - Copy - Copy - Copy.jpeg.fun
+C:\Users\rafwu\Desktop\data\6JS5H - Copy - Copy.jpeg.fun
+C:\Users\rafwu\Desktop\data\6JS5H - Copy.jpeg.fun
+C:\Users\rafwu\Desktop\data\6JS5H.jpeg.fun
+C:\Users\rafwu\Desktop\data\6pZz9OUhZxqz.gif.fun
+C:\Users\rafwu\Desktop\data\7GBR7 - Copy - Copy - Copy.jpeg.fun
+C:\Users\rafwu\Desktop\data\7GBR7 - Copy - Copy.jpeg.fun
+C:\Users\rafwu\Desktop\data\7GBR7 - Copy.jpeg.fun
+C:\Users\rafwu\Desktop\data\7GBR7.jpeg.fun
+C:\Users\rafwu\Desktop\data\7YNV6 - Copy - Copy - Copy.rar.fun
+C:\Users\rafwu\Desktop\data\7YNV6 - Copy - Copy.rar.fun
+C:\Users\rafwu\Desktop\data\7YNV6 - Copy.rar.fun
+C:\Users\rafwu\Desktop\data\7YNV6.rar.fun
+C:\Users\rafwu\Desktop\data\8S5719V - Copy - Copy - Copy.jpeg.fun
+C:\Users\rafwu\Desktop\data\8S5719V - Copy - Copy.jpeg.fun
+C:\Users\rafwu\Desktop\data\8S5719V - Copy.jpeg.fun
+C:\Users\rafwu\Desktop\data\8S5719V.jpeg.fun
+C:\Users\rafwu\Desktop\data\9CZWUW - Copy - Copy - Copy.cpp.fun
+C:\Users\rafwu\Desktop\data\9CZWUW - Copy - Copy.cpp.fun
+C:\Users\rafwu\Desktop\data\9CZWUW - Copy.cpp.fun
+C:\Users\rafwu\Desktop\data\9CZWUW.cpp.fun
+C:\Users\rafwu\Desktop\data\9M0HTJZ - Copy - Copy - Copy.gif.fun
+C:\Users\rafwu\Desktop\data\9M0HTJZ - Copy - Copy.gif.fun
+C:\Users\rafwu\Desktop\data\9M0HTJZ - Copy.gif.fun
+C:\Users\rafwu\Desktop\data\9M0HTJZ.gif.fun
+C:\Users\rafwu\Desktop\data\AY4O0I - Copy - Copy - Copy.zip.fun
+C:\Users\rafwu\Desktop\data\AY4O0I - Copy - Copy.zip.fun
+C:\Users\rafwu\Desktop\data\AY4O0I - Copy.zip.fun
+C:\Users\rafwu\Desktop\data\AY4O0I.zip.fun
+C:\Users\rafwu\Desktop\data\B0PY6BBQ - Copy - Copy - Copy.xlsx.fun
+C:\Users\rafwu\Desktop\data\B0PY6BBQ - Copy - Copy.xlsx.fun
+C:\Users\rafwu\Desktop\data\B0PY6BBQ - Copy.xlsx.fun
+C:\Users\rafwu\Desktop\data\B0PY6BBQ.xlsx.fun
+C:\Users\rafwu\Desktop\data\BThx5lMF.cpp.fun
+C:\Users\rafwu\Desktop\data\DHM9AH0IQ9 - Copy - Copy - Copy.c.fun
+C:\Users\rafwu\Desktop\data\DHM9AH0IQ9 - Copy - Copy.c.fun
+C:\Users\rafwu\Desktop\data\DHM9AH0IQ9 - Copy.c.fun
+C:\Users\rafwu\Desktop\data\DHM9AH0IQ9.c.fun
+C:\Users\rafwu\Desktop\data\GKXC2 - Copy - Copy - Copy.rar.fun
+C:\Users\rafwu\Desktop\data\GKXC2 - Copy - Copy.rar.fun
+C:\Users\rafwu\Desktop\data\GKXC2 - Copy.rar.fun
+C:\Users\rafwu\Desktop\data\GKXC2.rar.fun
+C:\Users\rafwu\Desktop\data\HNDZT.c.fun
+C:\Users\rafwu\Desktop\data\ISI25HSD - Copy - Copy - Copy.txt.fun
+C:\Users\rafwu\Desktop\data\ISI25HSD - Copy - Copy.txt.fun
+C:\Users\rafwu\Desktop\data\ISI25HSD - Copy.txt.fun
+C:\Users\rafwu\Desktop\data\ISI25HSD.txt.fun
+C:\Users\rafwu\Desktop\data\JDJzVzjVrNac.pdf.fun
+C:\Users\rafwu\Desktop\data\JlM7hAH9Cd.xls.fun
+C:\Users\rafwu\Desktop\data\JqdyFUjMu358b.rar.fun
+
+Restore result:
+C:\Users\rafwu\Desktop\data\1KRFRBL - Copy - Copy - Copy.png - restored file
+C:\Users\rafwu\Desktop\data\1KRFRBL - Copy - Copy.png - restored file
+C:\Users\rafwu\Desktop\data\1KRFRBL - Copy.png - restored file
+C:\Users\rafwu\Desktop\data\1KRFRBL.png - restored file
+C:\Users\rafwu\Desktop\data\3GS60G - Copy - Copy - Copy.gif - restored file
+C:\Users\rafwu\Desktop\data\3GS60G - Copy - Copy.gif - restored file
+C:\Users\rafwu\Desktop\data\3GS60G - Copy.gif - restored file
+C:\Users\rafwu\Desktop\data\3GS60G.gif - restored file
+C:\Users\rafwu\Desktop\data\45Q29V - Copy - Copy - Copy.zip - restored file
+C:\Users\rafwu\Desktop\data\45Q29V - Copy - Copy.zip - restored file
+C:\Users\rafwu\Desktop\data\45Q29V - Copy.zip - restored file
+C:\Users\rafwu\Desktop\data\45Q29V.zip - restored file
+C:\Users\rafwu\Desktop\data\4UAIDTASR9 - Copy - Copy - Copy.ppt - restored file
+C:\Users\rafwu\Desktop\data\4UAIDTASR9 - Copy - Copy.ppt - restored file
+C:\Users\rafwu\Desktop\data\4UAIDTASR9 - Copy.ppt - restored file
+C:\Users\rafwu\Desktop\data\4UAIDTASR9.ppt - restored file
+C:\Users\rafwu\Desktop\data\67T8KJ34 - Copy - Copy - Copy.gif - restored file
+C:\Users\rafwu\Desktop\data\67T8KJ34 - Copy - Copy.gif - restored file
+C:\Users\rafwu\Desktop\data\67T8KJ34 - Copy.gif - restored file
+C:\Users\rafwu\Desktop\data\67T8KJ34.gif - restored file
+C:\Users\rafwu\Desktop\data\6Ak4okg.ppt - trap file, not restored
+C:\Users\rafwu\Desktop\data\6JS5H - Copy - Copy - Copy.jpeg - restored file
+C:\Users\rafwu\Desktop\data\6JS5H - Copy - Copy.jpeg - restored file
+C:\Users\rafwu\Desktop\data\6JS5H - Copy.jpeg - restored file
+C:\Users\rafwu\Desktop\data\6JS5H.jpeg - restored file
+C:\Users\rafwu\Desktop\data\6pZz9OUhZxqz.gif - trap file, not restored
+C:\Users\rafwu\Desktop\data\7GBR7 - Copy - Copy - Copy.jpeg - restored file
+C:\Users\rafwu\Desktop\data\7GBR7 - Copy - Copy.jpeg - restored file
+C:\Users\rafwu\Desktop\data\7GBR7 - Copy.jpeg - restored file
+C:\Users\rafwu\Desktop\data\7GBR7.jpeg - restored file
+C:\Users\rafwu\Desktop\data\7YNV6 - Copy - Copy - Copy.rar - restored file
+C:\Users\rafwu\Desktop\data\7YNV6 - Copy - Copy.rar - restored file
+C:\Users\rafwu\Desktop\data\7YNV6 - Copy.rar - restored file
+C:\Users\rafwu\Desktop\data\7YNV6.rar - restored file
+C:\Users\rafwu\Desktop\data\8S5719V - Copy - Copy - Copy.jpeg - restored file
+C:\Users\rafwu\Desktop\data\8S5719V - Copy - Copy.jpeg - restored file
+C:\Users\rafwu\Desktop\data\8S5719V - Copy.jpeg - restored file
+C:\Users\rafwu\Desktop\data\8S5719V.jpeg - restored file
+C:\Users\rafwu\Desktop\data\9CZWUW - Copy - Copy - Copy.cpp - restored file
+C:\Users\rafwu\Desktop\data\9CZWUW - Copy - Copy.cpp - restored file
+C:\Users\rafwu\Desktop\data\9CZWUW - Copy.cpp - restored file
+C:\Users\rafwu\Desktop\data\9CZWUW.cpp - restored file
+C:\Users\rafwu\Desktop\data\9M0HTJZ - Copy - Copy - Copy.gif - restored file
+C:\Users\rafwu\Desktop\data\9M0HTJZ - Copy - Copy.gif - restored file
+C:\Users\rafwu\Desktop\data\9M0HTJZ - Copy.gif - restored file
+C:\Users\rafwu\Desktop\data\9M0HTJZ.gif - restored file
+C:\Users\rafwu\Desktop\data\AY4O0I - Copy - Copy - Copy.zip - restored file
+C:\Users\rafwu\Desktop\data\AY4O0I - Copy - Copy.zip - restored file
+C:\Users\rafwu\Desktop\data\AY4O0I - Copy.zip - restored file
+C:\Users\rafwu\Desktop\data\AY4O0I.zip - restored file
+C:\Users\rafwu\Desktop\data\B0PY6BBQ - Copy - Copy - Copy.xlsx - restored file
+C:\Users\rafwu\Desktop\data\B0PY6BBQ - Copy - Copy.xlsx - restored file
+C:\Users\rafwu\Desktop\data\B0PY6BBQ - Copy.xlsx - restored file
+C:\Users\rafwu\Desktop\data\B0PY6BBQ.xlsx - restored file
+C:\Users\rafwu\Desktop\data\BThx5lMF.cpp - trap file, not restored
+C:\Users\rafwu\Desktop\data\DHM9AH0IQ9 - Copy - Copy - Copy.c - restored file
+C:\Users\rafwu\Desktop\data\DHM9AH0IQ9 - Copy - Copy.c - restored file
+C:\Users\rafwu\Desktop\data\DHM9AH0IQ9 - Copy.c - restored file
+C:\Users\rafwu\Desktop\data\DHM9AH0IQ9.c - restored file
+C:\Users\rafwu\Desktop\data\GKXC2 - Copy - Copy - Copy.rar - restored file
+C:\Users\rafwu\Desktop\data\GKXC2 - Copy - Copy.rar - restored file
+C:\Users\rafwu\Desktop\data\GKXC2 - Copy.rar - restored file
+C:\Users\rafwu\Desktop\data\GKXC2.rar - restored file
+C:\Users\rafwu\Desktop\data\HNDZT.c - trap file, not restored
+C:\Users\rafwu\Desktop\data\ISI25HSD - Copy - Copy - Copy.txt - restored file
+C:\Users\rafwu\Desktop\data\ISI25HSD - Copy - Copy.txt - restored file
+C:\Users\rafwu\Desktop\data\ISI25HSD - Copy.txt - restored file
+C:\Users\rafwu\Desktop\data\ISI25HSD.txt - restored file
+C:\Users\rafwu\Desktop\data\JDJzVzjVrNac.pdf - trap file, not restored
+C:\Users\rafwu\Desktop\data\JlM7hAH9Cd.xls - trap file, not restored
+
+End file
