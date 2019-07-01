@@ -22,9 +22,13 @@ The user-mode application is written in C++/CLI.
 
 ## Examples
 
-<iframe width="560" height="315" src="https://www.youtube.com/embed/91QNTsN7H6Y" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+<div align="center">
+  <a href="https://youtu.be/91QNTsN7H6Y"><img src="https://i.imgur.com/GEjv3tn.png" alt="Detecting WannaCry"></a>
+</div>
 
-<iframe width="560" height="315" src="https://www.youtube.com/embed/awjAM1B6XCc" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+<div align="center">
+  <a href="https://youtu.be/awjAM1B6XCc"><img src="https://i.imgur.com/v3KPW7W.png" alt="Detecting Jigsaw"></a>
+</div>
 
 
 ## Open issues
