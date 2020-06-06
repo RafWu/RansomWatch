@@ -34,14 +34,6 @@ FSUnloadDriver(
 );
 
 FLT_POSTOP_CALLBACK_STATUS
-FSPostReadOperation(
-	_Inout_ PFLT_CALLBACK_DATA Data,
-	_In_ PCFLT_RELATED_OBJECTS FltObjects,
-	_In_opt_ PVOID CompletionContext,
-	_In_ FLT_POST_OPERATION_FLAGS Flags
-);
-
-FLT_POSTOP_CALLBACK_STATUS
 FSPostOperation(
 	_Inout_ PFLT_CALLBACK_DATA Data,
 	_In_ PCFLT_RELATED_OBJECTS FltObjects,
@@ -82,6 +74,7 @@ FSInstanceTeardownComplete(
 	_In_ FLT_INSTANCE_TEARDOWN_FLAGS Flags
 );
 
+// handles pre operation for read, write, set info and close files
 NTSTATUS
 FSProcessPreOperartion(
 	_Inout_ PFLT_CALLBACK_DATA Data,
@@ -112,17 +105,21 @@ FSProcessPostReadSafe(
 	_In_ FLT_POST_OPERATION_FLAGS Flags
 );
 
+// handles IRP_MJ_CREATE irps on post op
 FLT_POSTOP_CALLBACK_STATUS
 FSProcessCreateIrp(
 	_Inout_ PFLT_CALLBACK_DATA Data,
 	_In_ PCFLT_RELATED_OBJECTS FltObjects
 );
 
+// compares unicode string file name to the directories in protected areas in driverData object 
+// return true if the file is in one of the dirs
 BOOLEAN
 FSIsFileNameInScanDirs(
 	CONST PUNICODE_STRING path
 );
 
+// ZwQueryInformationProcess - dynamic loaded function which query info data about already opened processes 
 typedef NTSTATUS(*QUERY_INFO_PROCESS) (
 	__in HANDLE ProcessHandle,
 	__in PROCESSINFOCLASS ProcessInformationClass,
@@ -133,21 +130,30 @@ typedef NTSTATUS(*QUERY_INFO_PROCESS) (
 
 QUERY_INFO_PROCESS ZwQueryInformationProcess;
 
+// copy the file id info from the data argument (FLT_CALLBACK_DATA) to DRIVER_MESSAGE class allocated
 NTSTATUS CopyFileIdInfo(
 	_Inout_ PFLT_CALLBACK_DATA Data, 
 	PDRIVER_MESSAGE newItem
 );
 
+// recieves a pointer to allocated unicode string, FLT_RELATED_OBJECTS and FILE_NAME_INFORMATION class.
+// function gets the file name from the name info and flt objects and fill the unicode string with it
 NTSTATUS GetFileNameInfo(
 	_In_ PCFLT_RELATED_OBJECTS FltObjects,
 	PUNICODE_STRING FilePath,
 	PFLT_FILE_NAME_INFORMATION nameInfo
 );
 
+// copy extension info from FILE_NAME_INFORMATION class to null terminated wchar string
 VOID CopyExtension(
 	PWCHAR dest,
 	PFLT_FILE_NAME_INFORMATION nameInfo
 );
+
+// AddRemProcessRoutine is the function hooked to the processes creation and exit.
+// When a new process enter we add it to parent gid if there is any.
+// if parent doesnt have a gid and both are system process, new process isnt recorded
+// else we create a new gid for process
 
 VOID AddRemProcessRoutine(
 	HANDLE ParentId,

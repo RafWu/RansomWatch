@@ -24,7 +24,7 @@ ref class GProcessRecord {
 	ULONGLONG totalWriteOperations; // not used, for debug only
 	ULONGLONG totalRenameOperations; // not used, for debug only
 	ULONGLONG totalCreateOperations; // not used, for debug only
-	
+
 	ULONGLONG trapsRead;
 	ULONGLONG trapsWrite;
 	ULONGLONG trapsOpened; // not used, for debug only
@@ -434,7 +434,6 @@ ref class GProcessRecord {
 
 		//handle entropy
 		sumWeightWriteEntropy = (entropy * (DOUBLE)writeSize) + sumWeightWriteEntropy;
-		//averegeWriteEntropy = ((averegeWriteEntropy * totalWriteOperations + entropy) / (totalWriteOperations + 1));
 
 		totalWriteOperations++;
 	}
@@ -466,7 +465,6 @@ ref class GProcessRecord {
 
 		//handle entropy
 		sumWeightReadEntropy = (entropy * (DOUBLE)readSize) + sumWeightReadEntropy;
-		//averegeReadEntropy = ((averegeReadEntropy * totalReadOperations + entropy) / (totalReadOperations + 1));
 
 		totalReadOperations++;
 	}
@@ -518,11 +516,13 @@ ref class GProcessRecord {
 		return startTime;
 	}
 	
-			// assumes that caller protect this call
+	// assumes that caller protect this call
 	public: DateTime DateKilled() {
 		return killTime;
 	}
 
+
+	// check if process is malicious
 	public: BOOLEAN isProcessMalicious() {
 		Monitor::Enter(this);
 
@@ -577,7 +577,7 @@ ref class GProcessRecord {
 		BYTE triggersReached = deleteTrigger + createTrigger + 2 * renameTrigger + listingTrigger +
 			2 * highEntropyTrigger + 2 * extensionsTrigger  + 2 * trapsTrigger +
 			readTrigger + 2 * accessTrigger + 2 * extensionsChangeTrigger + 2 * moveTrigger;
-		if (triggersReached >= TRIGGERS_TRESHOLD  && numFilesChanged > 2) { // might want to remove num writes check
+		if (triggersReached >= TRIGGERS_TRESHOLD  && numFilesChanged > 2) { 
 			malicious = TRUE;
 			Monitor::Exit(this);
 			return TRUE;
@@ -699,11 +699,6 @@ ref class GProcessRecord {
 		}
 		return FALSE;
 	}
-
-	private: BOOLEAN WriteToFilesTrigger() {
-		return FALSE;
-	}
-
 	
 	private: BOOLEAN HighAccessTrigger() {
 		int writeCount = fileIdsWrite->Count + TRAP_WEIGHT * trapsWrite;

@@ -59,8 +59,7 @@ Return Value
 			Sleep(100);
 			continue;
 		}
-		// FIXME: compare memory size, replySize (minus AMP_REPLY_IRPS) with numOps and size of DRIVER_MESSAGE, assert numOps <= 10, log are fail thread accordingly
-		// FIXME : assert ReplyMsgs->data points to Buffer + sizeof(AMF_REPLY_IRPS)
+
 		Globals::Instance->postLogMessage(String::Concat("<V> Received num ops: ", numOps, System::Environment::NewLine), VERBOSE_ONLY);
 		while (pMsgIrp != nullptr) 
 		{
@@ -135,54 +134,19 @@ VOID HandleMaliciousApplication(GProcessRecord^ record, HANDLE comPort) {
 		ULONGLONG gid = record->Gid();
 		String^ gidStr = gid.ToString();
 		String^ appName = record->Name();
-		//DWORD failReason = 0; 
-		//BOOLEAN isTerminateSuc;
-		//DWORD isKilled;
+
 		Globals::Instance->postLogMessage(String::Concat("<I> Handling malicious application: ", appName, " with RansomWatch gid: ", gidStr, System::Environment::NewLine), PRIORITY_PRINT);
 		if (Globals::Instance->getKillStat()) {
 			Globals::Instance->postLogMessage(String::Concat("<I> Attempt to kill processes using driver", System::Environment::NewLine), PRIORITY_PRINT);
 			Monitor::Enter(record);
 			if (record->isMalicious() && !record->isKilled())
 			{
-				/*HANDLE pHandle = OpenProcess(PROCESS_TERMINATE | SYNCHRONIZE, false, pid);
-				if (pHandle != nullptr)
-				{
-					isTerminateSuc = TerminateProcess(pHandle, 1); // exit with failure
-					if (isTerminateSuc)
-					{
-						isKilled = WaitForSingleObject(pHandle, 100); // 
-						if (isKilled != WAIT_TIMEOUT) {
-							record->setKilled();
-							CloseHandle(pHandle);
-							Monitor::Exit(record);
-							Globals::Instance->postLogMessage(String::Concat("Killed malicious process: ", appName, " with pid: ", pidStr, System::Environment::NewLine), PRIORITY_PRINT);
-							return;
-						}
-					}
-					// reach here only if kill failed
-					CloseHandle(pHandle);
-				}
-				Monitor::Exit(record);
-				String^ failedOn;
-				failReason = GetLastError();
-				if (pHandle == nullptr) {
-					failedOn = gcnew String(" Failed on Open process");
-				}
-				else if (isTerminateSuc){
-					failedOn = isKilled.ToString();
-				}
-				else {
-					failedOn = gcnew String(" Failed Terminate process");
-				}
-				Globals::Instance->postLogMessage(String::Concat("Failed to kill process using application, using driver to kill. error code: ", failReason.ToString(), failedOn, System::Environment::NewLine), PRIORITY_PRINT);
-				*/
 				COM_MESSAGE killPidMsg;
 				NTSTATUS retOp = S_OK;
 				DWORD retSize;
 				killPidMsg.type = MESSAGE_KILL_GID;
 				killPidMsg.gid = gid;
-				//Monitor::Enter(record);
-				//if (!record->isKilled()) {
+
 				HRESULT hr = FilterSendMessage(comPort, &killPidMsg, sizeof(COM_MESSAGE), &retOp, sizeof(NTSTATUS), &retSize);
 				if (SUCCEEDED(hr) && retOp != E_ACCESSDENIED) {
 					record->setKilled();
@@ -196,11 +160,7 @@ VOID HandleMaliciousApplication(GProcessRecord^ record, HANDLE comPort) {
 				if (FAILED(hr) || retOp != S_OK) {
 					Globals::Instance->postLogMessage(String::Concat("<E> Failed to kill process using driver, gid: ", gidStr, System::Environment::NewLine), PRIORITY_PRINT);
 				}
-				//}
-				//else {
-				//	Monitor::Exit(record);
-				//	DBOUT("Process already killed" << std::endl);
-				//}
+
 			}
 			else {
 				Monitor::Exit(record);
@@ -223,7 +183,6 @@ VOID CheckHandleMaliciousApplication(ULONGLONG gid, HANDLE comPort) {
 	if (ProcessesMemory::Instance->Processes->TryGetValue(gid, record) && record != nullptr) {
 		if (record->isProcessMalicious()) {
 			if (!record->setReported()) return;
-			//Globals::Instance->postLogMessage(String::Concat("<W> Found malicious application", System::Environment::NewLine), PRIORITY_PRINT);
 			HandleMaliciousApplication(record, comPort);
 			Generic::SortedSet<String^>^ triggersDetected = record->GetTriggersBreached();
 			String^ msg = gcnew String("<I> Breached triggers: ");
@@ -236,7 +195,7 @@ VOID CheckHandleMaliciousApplication(ULONGLONG gid, HANDLE comPort) {
 			try {
 				StreamWriter^ sw = gcnew StreamWriter(reportFile);
 				sw->WriteLine("RansomWatch report file");
-				sw->Write("Files report for ransomware running from exe: "); // FIXME: on kill message return image files paths and report
+				sw->Write("Files report for ransomware running from exe: "); // improve: on kill message return image files paths and report
 				sw->WriteLine(record->Name());
 				sw->Write("Process started on time: ");
 				sw->WriteLine(record->DateStart().ToLocalTime());

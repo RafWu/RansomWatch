@@ -28,9 +28,9 @@ NTSTATUS InitCommData(
 			&commHandle->ServerPort,
 			&oa,
 			NULL,
-			AMFConnect,
-			AMFDissconnect,
-			AMFNewMessage,
+			RWFConnect,
+			RWFDissconnect,
+			RWFNewMessage,
 			1);
 		//
 		//  Free the security descriptor in all cases. It is not needed once
@@ -67,7 +67,7 @@ void CommClose()
 }
 
 NTSTATUS
-AMFConnect(
+RWFConnect(
 	_In_ PFLT_PORT ClientPort,
 	_In_opt_ PVOID ServerPortCookie,
 	_In_reads_bytes_opt_(SizeOfContext) PVOID ConnectionContext,
@@ -100,7 +100,7 @@ AMFConnect(
 
 
 VOID
-AMFDissconnect(
+RWFDissconnect(
 	_In_opt_ PVOID ConnectionCookie
 )
 {
@@ -122,7 +122,8 @@ AMFDissconnect(
 	commHandle->CommClosed = TRUE;
 }
 
-NTSTATUS AMFNewMessage(
+NTSTATUS 
+RWFNewMessage(
 	IN PVOID PortCookie,
 	IN PVOID InputBuffer,
 	IN ULONG InputBufferLength,

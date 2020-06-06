@@ -21,21 +21,22 @@ Environment :
 const PWSTR ComPortName = L"\\RWFilter";
 
 #define MAX_FILE_NAME_LENGTH 520
-#define MAX_FILE_NAME_SIZE (MAX_FILE_NAME_LENGTH * sizeof(WCHAR))
+#define MAX_FILE_NAME_SIZE (MAX_FILE_NAME_LENGTH * sizeof(WCHAR)) // max length in bytes of files sizes and dir paths
 #define FILE_OBJECT_ID_SIZE 16
-#define FILE_OBJEC_MAX_EXTENSION_SIZE 11
-#define MAX_COMM_BUFFER_SIZE 0x100000
-#define MAX_OPS_SAVE 0x10000
+#define FILE_OBJEC_MAX_EXTENSION_SIZE 11 
+#define MAX_COMM_BUFFER_SIZE 0x100000 // size of the buffer we allocate to recieve irp ops from the driver 
+#define MAX_OPS_SAVE 0x10000 // max ops to save, we limit this to prevent driver from filling the non paged memory and crashing the os
 
+// msgs types that the application may send to the driver
 enum COM_MESSAGE_TYPE {
 	MESSAGE_ADD_SCAN_DIRECTORY,
 	MESSAGE_REM_SCAN_DIRECTORY,
 	MESSAGE_GET_OPS,
 	MESSAGE_SET_PID,
 	MESSAGE_KILL_GID
-	
 };
 
+// msgs struct that the application send when sending msg to the driver, type member should be one of the COM_MESSAGE_TYPE
 typedef struct _COM_MESSAGE {
 	ULONG type;
 	ULONG pid;
@@ -95,12 +96,7 @@ typedef struct _DRIVER_MESSAGE {
 	
 } DRIVER_MESSAGE, *PDRIVER_MESSAGE;
 
-/*
-typedef struct _AMF_IRP_OP {
-
-} AMF_IRP_OP, PAMF_IRP_OP;
-*/
-
+// header for return buffer from driver on irp ops, has pointer to the first driver message, num ops in the buffer and readable data size in the buffer
 typedef struct _RWD_REPLY_IRPS {
 	size_t dataSize; // 8 bytes
 	PDRIVER_MESSAGE data; // 8 bytes points to the first IRP driver message, the next DRIVER_MESSAGE is a pointer inside DRIVER_MESSAGE
@@ -124,5 +120,3 @@ typedef struct _RWD_REPLY_IRPS {
 
 	}
 } RWD_REPLY_IRPS, *PRWD_REPLY_IRPS;
-
-//constexpr ULONG MAX_COMM_BUFFER_SIZE = sizeof(AMF_REPLY_IRPS) + MAX_IRP_OPS_PER_REQUEST * sizeof(DRIVER_MESSAGE);

@@ -3,6 +3,8 @@
 #include <Windows.h>
 #include "../SharedDefs/SharedDefs.h"
 
+// manged type for FILE_ID_INFO struct, build from FILE_ID_INFO
+// this value struct has its own hash code function and comparing
 value struct FileId {
 	ULONGLONG volumeSerialNumber;
 	array<BYTE>^ fileId;

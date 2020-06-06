@@ -32,12 +32,18 @@ extern CommHandler* commHandle;
 NTSTATUS InitCommData(
 );
 
+// close the comm handler, close both ports
 void CommClose();
 
 BOOLEAN IsCommClosed();
 
+
+
+// AMFConnect: Handles user mode application which connects to the driver
+
+
 NTSTATUS
-AMFConnect(
+RWFConnect(
 	_In_ PFLT_PORT ClientPort,
 	_In_opt_ PVOID ServerPortCookie,
 	_In_reads_bytes_opt_(SizeOfContext) PVOID ConnectionContext,
@@ -45,7 +51,9 @@ AMFConnect(
 	_Outptr_result_maybenull_ PVOID* ConnectionCookie
 );
 
-NTSTATUS AMFNewMessage(
+// AMFConnect: handle messages recieved from user mode
+
+NTSTATUS RWFNewMessage(
 	IN PVOID PortCookie,
 	IN PVOID InputBuffer,
 	IN ULONG InputBufferLength,
@@ -54,8 +62,10 @@ NTSTATUS AMFNewMessage(
 	OUT PULONG ReturnOutputBufferLength
 );
 
+// AMFDissconnect: Handles user mode application which dissconnects from the driver
+
 VOID
-AMFDissconnect(
+RWFDissconnect(
 	_In_opt_ PVOID ConnectionCookie
 );
 

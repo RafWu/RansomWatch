@@ -30,7 +30,7 @@ struct HashNode
 	//fixme needs new and delete operator
 };
 
-//Our own Hashmap class 
+//Our own Hashmap class - implemented as array of list entries
 class HashMap
 {
 	//hash element array 
