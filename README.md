@@ -61,7 +61,8 @@ These instructions will get you a copy of the project up and running on your loc
 
 1. Clone or download this project and load RWatch.sln with Visual Studio.
 2. Make sure that the configuration manager is set to x64.
-3. Build the solution. This builds both the driver and the application. 
+3. Replace the Azure blob storage connection string in BackupService.h.
+4. Build the solution. This builds both the driver and the application. 
 
 ### Installing
 
