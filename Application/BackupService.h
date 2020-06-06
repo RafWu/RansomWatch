@@ -30,6 +30,8 @@ ref class BackupService
 private: CloudStorageAccount^ storageAccount;
 private: CloudBlobClient^ blobClient;
 private: CloudBlobContainer^ container;
+// FIXME: set an Azure storage account and create a Container. 
+// Get a storage account connection string and replace the string "storageConnectionString", we left this string as an example of usage.
 private: String^ storageConnectionString = "DefaultEndpointsProtocol=https;AccountName=ransomwatch;AccountKey=NuMOweAnOleVFw6O2o9FCVyIxiSkpaPcTQVpHhH1CPgAO3bBkV3CxEOCm9kHUQDKpG0bpAtadocqJOW+aAfGAw==;EndpointSuffix=core.windows.net";
 
 

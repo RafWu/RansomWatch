@@ -599,7 +599,7 @@ ref class GProcessRecord {
 		DOUBLE normDeletedFilesVsAccessed = 0;
 		int deletedFiles = fileIdsDeleted->Count + TRAP_WEIGHT * trapsDeleted;
 		int accessedFiles = fileIdsChecked->Count;
-		ULONGLONG numOfFilesProtected = Globals::Instance->addNumOfDirsProtected(0);
+		ULONGLONG numOfFilesProtected = Globals::Instance->addNumOfFilesProtected(0);
 		if (numOfFilesProtected > MINIMUM_FILES_THRESHOLD && accessedFiles > 0) { // enough files to decide
 			normDeletedFiles = (DOUBLE)(deletedFiles) / (DOUBLE)(numOfFilesProtected);
 			normDeletedFilesVsAccessed = (DOUBLE)(deletedFiles) / (DOUBLE)(accessedFiles);
@@ -625,7 +625,7 @@ ref class GProcessRecord {
 		DOUBLE normRenamedFilesVsAccessed = 0;
 		int renamedFiles = fileIdsRenamed->Count + TRAP_WEIGHT * trapsRenamed;
 		int accessedFiles = fileIdsChecked->Count;
-		ULONGLONG numOfFilesProtected = Globals::Instance->addNumOfDirsProtected(0);
+		ULONGLONG numOfFilesProtected = Globals::Instance->addNumOfFilesProtected(0);
 		if (numOfFilesProtected > MINIMUM_FILES_THRESHOLD && accessedFiles > 0) { // enough files to decide
 			normRenamedFiles = (DOUBLE)(renamedFiles) / (DOUBLE)(numOfFilesProtected);
 			normRenamedFilesVsAccessed = (DOUBLE)(renamedFiles) / (DOUBLE)(accessedFiles);
@@ -665,7 +665,7 @@ ref class GProcessRecord {
 		int extensionsChanged = filesExtensionChanged;
 		int accessedFiles = fileIdsChecked->Count;
 		DOUBLE normChangedExtensionsFiles = 0;
-		ULONGLONG numOfFilesProtected = Globals::Instance->addNumOfDirsProtected(0);
+		ULONGLONG numOfFilesProtected = Globals::Instance->addNumOfFilesProtected(0);
 		if (numOfFilesProtected > MINIMUM_FILES_THRESHOLD && accessedFiles > 0) { // enough files to decide
 			normChangedExtensionsFiles = (DOUBLE)(extensionsChanged) / (DOUBLE)(accessedFiles);
 		}
@@ -729,7 +729,7 @@ ref class GProcessRecord {
 	private: BOOLEAN ReadingTrigger() {
 		DOUBLE normReadProtected = 0;
 		int readCount = fileIdsRead->Count + TRAP_WEIGHT * trapsRead;
-		ULONGLONG numOfFilesProtected = Globals::Instance->addNumOfDirsProtected(0);
+		ULONGLONG numOfFilesProtected = Globals::Instance->addNumOfFilesProtected(0);
 		if (numOfFilesProtected > MINIMUM_FILES_THRESHOLD) // enough files to decide
 			normReadProtected = (DOUBLE)(readCount) / (DOUBLE)(numOfFilesProtected);
 		if (normReadProtected > FILES_READ_THRESHOLD) return TRUE;
